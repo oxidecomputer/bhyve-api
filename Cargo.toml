@@ -1,0 +1,8 @@
+[package]
+name = "bhyve-api"
+version = "0.0.1"
+authors = ["Allison Randal <allison@oxide.computer>"]
+edition = "2018"
+
+[dependencies]
+libc = "*"
