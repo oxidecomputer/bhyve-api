@@ -5,7 +5,7 @@
 //! a minimal interface, which can serve as the lowest userspace base
 //! layer for any hypervisor to use Bhyve's hardware virtualization features. It
 //! is essentially no more than a clean, safe wrapper around Bhyve's ioctl
-//! API (i.e `/dev/vvmctl`).
+//! interface (i.e `/dev/vvmctl`).
 //!
 //! As part of being a minimal interface, `bhyve-api` avoids external
 //! dependencies as much as possible, using only `libc` to access the

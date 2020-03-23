@@ -12,7 +12,6 @@ use crate::vmm_dev::{VMM_CREATE_VM, VMM_DESTROY_VM};
 /// owns the initial filehandle on `/dev/vmmctl`.
 ///
 ///     use bhyve_api::system::*;
-///     use bhyve_api::vm::*;
 ///     let system = VMMSystem::new().expect("failed to connect to VMM system ioctl handle");
 ///     let vm = system.create_vm("uniquename").expect("failed to create VM");
 ///     system.destroy_vm("uniquename").expect("failed to destroy VM");
@@ -42,10 +41,10 @@ impl VMMSystem {
         })
     }
 
-    /// Opens a filehandle for virtual machine operations, and returns a
-    /// `Result`. If the open operation fails, the `Result` unwraps as an
-    /// `Error`. If it succeeds, the `Result` unwraps as an instance of
-    /// `VirtualMachine` for performing virtual machine operations.
+    /// Creates a device for virtual machine operation at `/dev/vmm/[name]`,
+    /// and returns a `Result`. If the creation operation fails, the `Result`
+    /// unwraps as an `Error`. If it succeeds, the `Result` unwraps as `i32`
+    /// integer containing the integer return value of the ioctl operation.
 
     pub fn create_vm(&self, name: &str) -> Result<i32, Error> {
         let c_name = CString::new(name)?;
@@ -57,10 +56,10 @@ impl VMMSystem {
         }
     }
 
-    /// Opens a filehandle for virtual machine operations, and returns a
-    /// `Result`. If the open operation fails, the `Result` unwraps as an
-    /// `Error`. If it succeeds, the `Result` unwraps as an instance of
-    /// `VirtualMachine` for performing virtual machine operations.
+    /// Destroys a device for virtual machine operations at `/dev/vmm/[name]`,
+    /// and returns a `Result`. If the destruction operation fails, the `Result`
+    /// unwraps as an `Error`. If it succeeds, the `Result` unwraps as `i32`
+    /// integer containing the integer return value of the ioctl operation.
 
     pub fn destroy_vm(&self, name: &str) -> Result<i32, Error> {
         let c_name = CString::new(name)?;
