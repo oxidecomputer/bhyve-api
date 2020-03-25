@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Error;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::vmm_dev::{VMM_CREATE_VM, VMM_DESTROY_VM};
+use crate::include::vmm_dev::{VMM_CREATE_VM, VMM_DESTROY_VM};
 
 /// The VMMSystem module handles VMM system operations. It creates and
 /// owns the initial filehandle on `/dev/vmmctl`.
