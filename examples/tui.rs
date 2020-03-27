@@ -1,7 +1,12 @@
+// A simplistic text user interface (command-line interface) for the library.
+// Avoiding dev dependencies on external crates like Clap, so the argument
+// handling is primitive.
+
 extern crate bhyve_api;
 
 use std::env;
 use bhyve_api::system::*;
+use bhyve_api::vm::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -9,6 +14,8 @@ fn main() {
         cmd_create(&args[2]);
     } else if "destroy" == &args[1] {
         cmd_destroy(&args[2]);
+    } else if "run" == &args[1] {
+        cmd_run_vm(&args[2]);
     }
 }
 
@@ -25,5 +32,14 @@ fn cmd_destroy(vm_name: &str) {
     match vmmctl.destroy_vm(vm_name) {
         Ok(_) => println!("Destroyed a device at /dev/vmm/{}", vm_name),
         Err(e) => println!("Unable to destroy device at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+}
+
+fn cmd_run_vm(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+    match vm.run(0) {
+        Ok(_) => println!("Successful run for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed run for VM at /dev/vmm/{}, with error: {}", vm_name, e),
     };
 }

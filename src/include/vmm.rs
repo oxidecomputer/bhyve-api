@@ -235,6 +235,13 @@ pub struct vm_exit {
     pub u: vm_exit_payload,
 }
 
+impl Default for vm_exit {
+    fn default() -> vm_exit {
+        let payload = vm_exit_payload { empty: 0 };
+        vm_exit { exitcode: vm_exitcode::VM_EXITCODE_BOGUS, inst_length: 0, rip: 0, u: payload }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union vm_exit_payload {
@@ -250,7 +257,9 @@ pub union vm_exit_payload {
     pub ioapic_eoi: vm_exit_ioapic_eoi,
     pub suspended: vm_exit_suspended,
     pub task_switch: vm_task_switch,
+    empty: c_int,
 }
+
 
 #[repr(C)]
 #[derive(Copy, Clone)]

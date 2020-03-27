@@ -35,10 +35,23 @@ macro_rules! define_ioctl_op {
 // Identifies ioctl ops for Bhyve
 const VMM_IOC_GROUP: c_uint = (118 << 8); // 118 is ASCII for 'v'
 
-const IOCNUM_RUN: c_uint = 1;
+#[repr(C)]
+#[allow(non_camel_case_types, unused)]
+#[derive(Copy, Clone)]
+enum IocNum {
+        // general routines
+        IOCNUM_ABIVERS = 0,
+        IOCNUM_RUN = 1,
+        IOCNUM_SET_CAPABILITY = 2,
+        IOCNUM_GET_CAPABILITY = 3,
+        IOCNUM_SUSPEND = 4,
+        IOCNUM_REINIT = 5,
+}
 
 
-pub const VM_RUN: c_int = define_ioctl_op!(IOC_INOUT, IOCNUM_RUN, (size_of::<vm_run>() as c_uint));
+pub const VM_RUN: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RUN as c_uint, (size_of::<vm_run>() as c_uint));
+pub const VM_SUSPEND: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND as c_uint, (size_of::<vm_suspend>() as c_uint));
+pub const VM_REINIT: c_int = define_ioctl_op!(IOC_VOID, IocNum::IOCNUM_REINIT as c_uint, 0);
 
 
 // ioctls used against ctl device for vm create/destroy
@@ -51,7 +64,15 @@ pub const VMM_DESTROY_VM: c_int = (VMM_IOC_BASE | 0x02);
 
 // For VM_RUN
 #[repr(C)]
+#[derive(Copy, Clone, Default)]
 pub struct vm_run {
     pub cpuid: c_int,
     pub vm_exit: vm_exit,
+}
+
+// For VM_SUSPEND
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct vm_suspend {
+    pub how: vm_suspend_how,
 }
