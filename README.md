@@ -4,9 +4,9 @@ A Rust library interface to Bhyve's kernel ioctl interface
 
 ## Prerequisites
 
-The main requirement is Rust, the library has been tested on the
-version (1.42.0) packaged with OmniOS CE r151032. Install the package
-`ooce/developer/rust`.
+The main requirement is Rust, the Bhyve API library has been tested on
+the version (1.42.0) packaged with OmniOS CE r151032. Install the
+package `ooce/developer/rust`.
 
 ### Bhyve
 
