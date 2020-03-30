@@ -133,12 +133,6 @@ enum IocNum {
         IOCNUM_WRLOCK_CYCLE = 257,
 }
 
-// The size of the 'vm_run' struct is coming out as 144 in Rust, which is making
-// the ioctl op come out as a different number than the #defines in the original
-// C code. Checking the size of the structs separately in GCC gives 132, but,
-// 132 also isn't comparing correctly with the VM_RUN ioctl calculated in the
-// kernel module.
-// pub const VM_RUN: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RUN as c_uint, 132);
 pub const VM_RUN: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RUN as c_uint, (size_of::<vm_run>() as c_uint));
 pub const VM_SUSPEND: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND as c_uint, (size_of::<vm_suspend>() as c_uint));
 pub const VM_REINIT: c_int = define_ioctl_op!(IOC_VOID, IocNum::IOCNUM_REINIT as c_uint, 0);
@@ -210,14 +204,13 @@ mod tests {
 
     #[test]
     fn test_ioctl_stats() {
-        assert_eq!(size_of::<vm_stats>(), 792);
+        assert_eq!(size_of::<vm_stats>(), 0x318);
         assert_eq!(VM_STATS_IOC as u32, 0xc0187632);
     }
 
     #[test]
     fn test_ioctl_general() {
-        // GCC says this should be 132, but that's not right either
-        assert_eq!(size_of::<vm_run>(), 144);
+        assert_eq!(size_of::<vm_run>(), 0x90);
         assert_eq!(size_of::<vm_suspend>(), 4);
 
         //assert_eq!(VM_RUN as u32, 0xc0847601);
