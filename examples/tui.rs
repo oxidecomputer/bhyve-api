@@ -16,6 +16,10 @@ fn main() {
         cmd_destroy(&args[2]);
     } else if "run" == &args[1] {
         cmd_run_vm(&args[2]);
+    } else if "stats" == &args[1] {
+        cmd_stats_vm(&args[2]);
+    } else if "topology" == &args[1] {
+        cmd_cpu_top(&args[2]);
     }
 }
 
@@ -38,8 +42,35 @@ fn cmd_destroy(vm_name: &str) {
 fn cmd_run_vm(vm_name: &str) {
     let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
     println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    match vm.set_topology(1, 1, 1, 2) {
+        Ok(_) => println!("Set CPU topology for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed to set CPU topology for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+
+    let (sockets, cores, threads, maxcpus) = vm.get_topology().expect("failed to get CPU topology for VM");
+    println!("CPU topology current values: sockets={}, cores={}, threads={}, maxcpus={}", sockets, cores, threads, maxcpus);
+
     match vm.run(0) {
         Ok(_) => println!("Successful run for VM at /dev/vmm/{}", vm_name),
         Err(e) => println!("Failed run for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+}
+
+fn cmd_cpu_top(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    let (sockets, cores, threads, maxcpus) = vm.get_topology().expect("failed to get CPU topology for VM");
+    println!("CPU topology current values: sockets={}, cores={}, threads={}, maxcpus={}", sockets, cores, threads, maxcpus);
+}
+
+fn cmd_stats_vm(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    match vm.get_stats(0) {
+        Ok(entries) => println!("Got stats for VM at /dev/vmm/{}, {} entries", vm_name, entries),
+        Err(e) => println!("Failed to get stats for VM at /dev/vmm/{}, with error: {}", vm_name, e),
     };
 }

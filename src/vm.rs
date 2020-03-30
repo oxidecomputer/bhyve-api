@@ -46,6 +46,57 @@ impl VirtualMachine {
         })
     }
 
+    /// Sets basic attributes of CPUs on the VirtualMachine: sockets, cores,
+    /// threads, and maximum number of CPUs.
+    pub fn set_topology(&self, sockets: u16, cores: u16, threads: u16, maxcpus: u16) -> Result<bool, Error> {
+        let top_data = vm_cpu_topology {
+            sockets: sockets,
+            cores: cores,
+            threads: threads,
+            maxcpus: maxcpus,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_TOPOLOGY, &top_data) };
+        println!("Attempting to set CPU topology: sockets={}, cores={}, threads={}, maxcpus={}", top_data.sockets, top_data.cores, top_data.threads, top_data.maxcpus);
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Gets current settings for CPUs on the VirtualMachine: sockets, cores,
+    /// threads, and maximum number of CPUs.
+    pub fn get_topology(&self) -> Result<(u16, u16, u16, u16), Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut top = vm_cpu_topology::default();
+        println!("current value of ioctl command {:x}", VM_GET_TOPOLOGY);
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_TOPOLOGY, &mut top) };
+        if result == 0 {
+            return Ok((top.sockets, top.cores, top.threads, top.maxcpus));
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Gets current stats for a CPUs on the VirtualMachine.
+    pub fn get_stats(&self, vcpu_id: i32) -> Result<i32, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        //let mut vmstats = vm_stats::default();
+        //vmstats.cpuid = vcpu_id;
+        let mut stats_data = vm_stats {
+            cpuid: vcpu_id,
+            ..Default::default()
+        };
+        println!("current value of ioctl command {:b}", VM_STATS_IOC);
+        println!("current value of ioctl command {:x}", VM_STATS_IOC);
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_STATS_IOC, &mut stats_data) };
+        if result == 0 {
+            return Ok(stats_data.num_entries);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
     /// Runs the VirtualMachine, and returns an exit reason.
     pub fn run(&self, vcpu_id: i32) -> Result<VmExit, Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
@@ -59,9 +110,6 @@ impl VirtualMachine {
             // println!("VCPU ID is {}", cid);
             //let exitcode = run_data.vm_exit.exitcode;
             //println!("Exit code is {}", exitcode);
-            return Ok(VmExit::Bogus);
-        } else if result == -1 {
-            println!("Error from ioctl");
             return Ok(VmExit::Bogus);
         } else {
             return Err(Error::last_os_error());

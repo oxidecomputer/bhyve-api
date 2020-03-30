@@ -6,6 +6,8 @@
 
 use std::os::raw::{c_int, c_uint, c_ulonglong};
 
+pub const VM_MAXCPU: usize = 32;    // maximum virtual cpus
+
 #[repr(C)]
 #[allow(non_camel_case_types, unused)]
 #[derive(Copy, Clone)]
@@ -238,7 +240,12 @@ pub struct vm_exit {
 impl Default for vm_exit {
     fn default() -> vm_exit {
         let payload = vm_exit_payload { empty: 0 };
-        vm_exit { exitcode: vm_exitcode::VM_EXITCODE_BOGUS, inst_length: 0, rip: 0, u: payload }
+        vm_exit {
+            exitcode: vm_exitcode::VM_EXITCODE_BOGUS,
+            inst_length: 0,
+            rip: 0,
+            u: payload
+        }
     }
 }
 
