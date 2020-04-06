@@ -142,6 +142,11 @@ pub const VM_GET_TOPOLOGY: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_GET_
 pub const VM_STATS_IOC: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_VM_STATS as c_uint, (size_of::<vm_stats>() as c_uint));
 
 
+pub const VM_ACTIVATE_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_ACTIVATE_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
+pub const VM_SUSPEND_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
+pub const VM_RESUME_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RESUME_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
+
+
 // ioctls used against ctl device for vm create/destroy
 const VMM_IOC_BASE: c_int = ((86 << 16) | (77 << 8)); // ASCII for 'V' and 'M'
 pub const VMM_CREATE_VM: c_int = (VMM_IOC_BASE | 0x01);
@@ -163,6 +168,13 @@ pub struct vm_run {
 #[derive(Copy, Clone)]
 pub struct vm_suspend {
     pub how: vm_suspend_how,
+}
+
+// For VM_ACTIVATE_CPU, VM_SUSPEND_CPU, and VM_RESUME_CPU
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct vm_activate_cpu {
+    pub vcpuid: c_int,
 }
 
 // For VM_SET_TOPOLOGY and VM_GET_TOPOLOGY
@@ -221,6 +233,7 @@ mod tests {
 
     #[test]
     fn test_ioctl_topology() {
+        assert_eq!(size_of::<vm_activate_cpu>(), 4);
         assert_eq!(size_of::<vm_cpu_topology>(), 8);
         assert_eq!(VM_SET_TOPOLOGY as u32, 0x8008763f);
         assert_eq!(VM_GET_TOPOLOGY as u32, 0x40087640);

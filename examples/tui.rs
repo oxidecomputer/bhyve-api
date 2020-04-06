@@ -19,7 +19,13 @@ fn main() {
     } else if "stats" == &args[1] {
         cmd_stats_vm(&args[2]);
     } else if "topology" == &args[1] {
-        cmd_cpu_top(&args[2]);
+        cmd_vcpu_top(&args[2]);
+    } else if "activate" == &args[1] {
+        cmd_vcpu_activate(&args[2]);
+    } else if "suspend" == &args[1] {
+        cmd_vcpu_suspend(&args[2]);
+    } else if "resume" == &args[1] {
+        cmd_vcpu_resume(&args[2]);
     }
 }
 
@@ -57,7 +63,7 @@ fn cmd_run_vm(vm_name: &str) {
     };
 }
 
-fn cmd_cpu_top(vm_name: &str) {
+fn cmd_vcpu_top(vm_name: &str) {
     let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
     println!("Opened a filehandle to /dev/vmm/{}", vm.name);
 
@@ -72,5 +78,35 @@ fn cmd_stats_vm(vm_name: &str) {
     match vm.get_stats(0) {
         Ok(entries) => println!("Got stats for VM at /dev/vmm/{}, {} entries", vm_name, entries),
         Err(e) => println!("Failed to get stats for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+}
+
+fn cmd_vcpu_activate(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    match vm.activate_vcpu(0) {
+        Ok(_) => println!("Activated CPU 0 for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed to activate CPU 0 for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+}
+
+fn cmd_vcpu_suspend(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    match vm.suspend_vcpu(0) {
+        Ok(_) => println!("Suspended CPU 0 for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed to suspend CPU 0 for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+}
+
+fn cmd_vcpu_resume(vm_name: &str) {
+    let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
+    println!("Opened a filehandle to /dev/vmm/{}", vm.name);
+
+    match vm.resume_vcpu(0) {
+        Ok(_) => println!("Resumed CPU 0 for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed to resume CPU 0 for VM at /dev/vmm/{}, with error: {}", vm_name, e),
     };
 }

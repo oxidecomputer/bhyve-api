@@ -69,7 +69,6 @@ impl VirtualMachine {
     pub fn get_topology(&self) -> Result<(u16, u16, u16, u16), Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
         let mut top = vm_cpu_topology::default();
-        println!("current value of ioctl command {:x}", VM_GET_TOPOLOGY);
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_TOPOLOGY, &mut top) };
         if result == 0 {
             return Ok((top.sockets, top.cores, top.threads, top.maxcpus));
@@ -81,17 +80,49 @@ impl VirtualMachine {
     /// Gets current stats for a CPUs on the VirtualMachine.
     pub fn get_stats(&self, vcpu_id: i32) -> Result<i32, Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
-        //let mut vmstats = vm_stats::default();
-        //vmstats.cpuid = vcpu_id;
         let mut stats_data = vm_stats {
             cpuid: vcpu_id,
             ..Default::default()
         };
-        println!("current value of ioctl command {:b}", VM_STATS_IOC);
-        println!("current value of ioctl command {:x}", VM_STATS_IOC);
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_STATS_IOC, &mut stats_data) };
         if result == 0 {
             return Ok(stats_data.num_entries);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Activates a Virtual CPU on the VirtualMachine.
+    pub fn activate_vcpu(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let cpu_data = vm_activate_cpu { vcpuid: vcpu_id };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_ACTIVATE_CPU, &cpu_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Suspends a Virtual CPU on the VirtualMachine.
+    pub fn suspend_vcpu(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let cpu_data = vm_activate_cpu { vcpuid: vcpu_id };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SUSPEND_CPU, &cpu_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Resumes a Virtual CPU on the VirtualMachine.
+    pub fn resume_vcpu(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let cpu_data = vm_activate_cpu { vcpuid: vcpu_id };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RESUME_CPU, &cpu_data) };
+        if result == 0 {
+            return Ok(true);
         } else {
             return Err(Error::last_os_error());
         }
