@@ -3,10 +3,15 @@
 //! These are defined in Rust, but mimic the C constants and structs
 //! defined in `machine/vmm_dev.h`, `sys/ioccom.h`, and `sys/time.h`.
 
-use std::os::raw::{c_int, c_uint, c_long, c_ulonglong};
+use std::os::raw::{c_int, c_uint, c_long, c_longlong, c_ulonglong, c_char};
 use std::mem::size_of;
+use libc::{size_t};
 
 use crate::include::vmm::*;
+
+// Define const from sys/param.h
+
+const SPECNAMELEN: usize = 63; // max length of devicename
 
 // Define struct from sys/time.h
 
@@ -137,6 +142,13 @@ pub const VM_RUN: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RUN as c_ui
 pub const VM_SUSPEND: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND as c_uint, (size_of::<vm_suspend>() as c_uint));
 pub const VM_REINIT: c_int = define_ioctl_op!(IOC_VOID, IocNum::IOCNUM_REINIT as c_uint, 0);
 
+pub const VM_ALLOC_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_ALLOC_MEMSEG as c_uint, (size_of::<vm_memseg>() as c_uint));
+pub const VM_GET_MEMSEG: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_MEMSEG as c_uint, (size_of::<vm_memseg>() as c_uint));
+
+pub const VM_MMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MMAP_MEMSEG as c_uint, (size_of::<vm_memmap>() as c_uint));
+pub const VM_MMAP_GETNEXT: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_MMAP_GETNEXT as c_uint, (size_of::<vm_memmap>() as c_uint));
+pub const VM_MUNMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MUNMAP_MEMSEG as c_uint, (size_of::<vm_munmap>() as c_uint));
+
 pub const VM_SET_TOPOLOGY: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_TOPOLOGY as c_uint, (size_of::<vm_cpu_topology>() as c_uint));
 pub const VM_GET_TOPOLOGY: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_GET_TOPOLOGY as c_uint, (size_of::<vm_cpu_topology>() as c_uint));
 pub const VM_STATS_IOC: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_VM_STATS as c_uint, (size_of::<vm_stats>() as c_uint));
@@ -146,6 +158,8 @@ pub const VM_ACTIVATE_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_ACTIV
 pub const VM_SUSPEND_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
 pub const VM_RESUME_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RESUME_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
 
+pub const VM_DEVMEM_GETOFFSET: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_DEVMEM_GETOFFSET as c_uint, (size_of::<vm_devmem_offset>() as c_uint));
+
 
 // ioctls used against ctl device for vm create/destroy
 const VMM_IOC_BASE: c_int = ((86 << 16) | (77 << 8)); // ASCII for 'V' and 'M'
@@ -154,6 +168,66 @@ pub const VMM_DESTROY_VM: c_int = (VMM_IOC_BASE | 0x02);
 
 
 // Define structs from machine/vmm_dev.h
+
+// For VM_MMAP_MEMSEG
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_memmap {
+    pub gpa: c_ulonglong,
+    pub segid: c_int,            // memory segment
+    pub segoff: c_longlong,      // offset into memory segment
+    pub len: size_t,             // mmap length
+    pub prot: c_int,             // RWX
+    pub flags: c_int,
+}
+
+pub const VM_MEMMAP_F_WIRED: c_int = 0x01;
+#[allow(unused)]
+pub const VM_MEMMAP_F_IOMMU: c_int = 0x02;
+
+// For VM_MUNMAP_MEMSEG
+#[repr(C)]
+pub struct vm_munmap {
+    pub gpa: c_ulonglong,
+    pub len: size_t,
+}
+
+
+// For VM_ALLOC_MEMSEG and VM_GET_MEMSEG
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct vm_memseg {
+    pub segid: c_int,
+    pub len: size_t,
+    pub name: [c_char; SPECNAMELEN + 1],
+}
+
+impl Default for vm_memseg {
+    fn default() -> vm_memseg {
+        vm_memseg {
+            segid: 0,
+            len: 0,
+            name: [0 as c_char; SPECNAMELEN + 1],
+        }
+    }
+}
+
+// For VM_DEVMEM_GETOFFSET
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_devmem_offset {
+    pub segid: c_int,
+    pub offset: c_longlong,
+}
+
+// For VM_SET_REGISTER and VM_GET_REGISTER
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+struct vm_register {
+    pub cpuid: c_int,
+    pub regnum: c_int,      // enum vm_reg_name
+    pub regval: c_ulonglong,
+}
 
 // For VM_RUN
 #[repr(C)]

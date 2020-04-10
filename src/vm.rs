@@ -1,16 +1,22 @@
 //! Bhyve virtual machine operations.
 
 use libc::{ioctl, open, O_RDWR};
-use std::ffi::CString;
+use std::ffi::{CString, CStr};
 use std::fs::File;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::ptr::null_mut;
 
 use crate::include::vmm::{vm_suspend_how};
 use crate::include::vmm_dev::*;
 
 const MB: u64 = (1024 * 1024);
 const GB: u64 = (1024 * MB);
+
+// Size of the guard region before and after the virtual address space
+// mapping the guest physical memory. This must be a multiple of the
+// superpage size for performance reasons.
+const VM_MMAP_GUARD_SIZE: usize = 4 * MB as usize;
 
 /// The VirtualMachine module handles Bhyve virtual machine operations.
 /// It owns the filehandle for these operations.
@@ -46,9 +52,203 @@ impl VirtualMachine {
         })
     }
 
+    /// Map segment 'segid' starting at 'off' into guest address range (gpa,gpa+len).
+    pub fn mmap_memseg(&self, gpa: u64, segid: MemSegId, off: i64, len: usize, prot: i32) -> Result<bool, Error> {
+        let mut flags = 0;
+        if (self.memflags & VM_MEM_F_WIRED) != 0 {
+            flags = VM_MEMMAP_F_WIRED;
+        }
+
+        let mem_data = vm_memmap {
+            gpa: gpa,
+            segid: segid as i32,
+            segoff: off,
+            len: len,
+            prot: prot,
+            flags: flags,
+        };
+
+	// If this mapping already exists then don't create it again. This
+	// is the common case for SYSMEM mappings created by bhyveload(8).
+        match self.mmap_getnext(gpa) {
+            Ok(exists) => if exists.gpa == mem_data.gpa {
+                // A memory segment already exists at the same guest physical address
+                // we are trying to create.
+                if exists.segid == mem_data.segid && exists.segoff == mem_data.segoff &&
+                   exists.prot == mem_data.prot && exists.flags == mem_data.flags {
+                    // The existing memory segment is identical to the one we want to
+                    // create, so do nothing, and return a success value.
+                    return Ok(true);
+                } else {
+                    // The existing memory segment is not identical to the one we want
+                    // to create, so return an error value.
+                    return Err(Error::from(ErrorKind::AlreadyExists));
+                }
+            }
+            Err(_) => (), // The memory segment wasn't found, so we should create it
+        };
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_MMAP_MEMSEG, &mem_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Iterate over the guest address space. This function finds an address range
+    /// that starts at an address >= 'gpa'.
+    ///
+    /// Returns Ok if the next address range was found and an Error otherwise.
+
+    fn mmap_getnext(&self, gpa: u64) -> Result<vm_memmap, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut memseg_data = vm_memmap {
+            gpa: gpa,
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_MMAP_GETNEXT, &mut memseg_data) };
+        if result == 0 {
+            return Ok(memseg_data);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn munmap_memseg(&self, gpa: u64, len: usize) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let mem_data = vm_munmap {
+            gpa: gpa,
+            len: len,
+        };
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_MUNMAP_MEMSEG, &mem_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn alloc_memseg(&self, segid: MemSegId, len: usize, name: &str) -> Result<bool, Error> {
+        let c_name = CString::new(name)?;
+
+        // If the memory segment has already been created then just return.
+        // This is the usual case for the SYSMEM segment created by userspace
+        // loaders like bhyveload(8).
+        match self.get_memseg(segid) {
+            Ok(exists) => if exists.len != 0 {
+                // A memory segment already exists with the same segment ID as the one
+                // we are trying to allocate.
+                //let exists_name = CStr::from_bytes_with_nul(exists.name)?;
+                let r_name = unsafe { CStr::from_ptr(exists.name.as_ptr()) };
+                let exists_name = r_name.to_owned();
+                if exists.len == len && exists_name == c_name {
+                    // The existing memory segment is identical to the one we want to
+                    // allocate, so do nothing, and return a success value.
+                    return Ok(true);
+                } else {
+                    // The existing memory segment is not identical to the one we want
+                    // to allocate, so return an error value.
+                    return Err(Error::from(ErrorKind::InvalidInput));
+                }
+            }
+            Err(e) => return Err(e),
+        };
+
+        // Struct is allocated (and owned) by Rust
+        let mut memseg_data = vm_memseg {
+            segid: segid as i32,
+            len: len,
+            ..Default::default()
+        };
+        // memseg_data.name.clone_from_slice(c_name.as_bytes_with_nul());
+        if name.len() >= memseg_data.name.len() {
+            // name is too long for vm_memseg struct
+            return Err(Error::from(ErrorKind::InvalidInput));
+        } else {
+            // Copy each character from the CString to the char array
+            for (to, from) in memseg_data.name.iter_mut().zip(c_name.as_bytes_with_nul()) {
+                *to = *from as i8;
+            }
+        }
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_ALLOC_MEMSEG, &memseg_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    fn get_memseg(&self, segid: MemSegId) -> Result<vm_memseg, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut memseg_data = vm_memseg {
+            segid: segid as i32,
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_MEMSEG, &mut memseg_data) };
+        if result == 0 {
+            return Ok(memseg_data);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn create_devmem(&self, segid: MemSegId, name: &str, len: usize) -> Result<bool, Error> {
+        self.alloc_memseg(segid, len, name)?;
+        let mapoff = self.get_devmem_offset(segid)?;
+        let len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
+        let base: *mut u8 = unsafe {
+            libc::mmap(
+                null_mut(),
+                len2,
+                libc::PROT_NONE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+                -1,
+                0,
+            ) as *mut u8
+        };
+
+//        let ptr: *mut u8 = unsafe {
+//            libc::mmap(
+//                base + VM_MMAP_GUARD_SIZE,
+//                len,
+//                libc::PROT_READ | libc::PROT_WRITE,
+//                libc::MAP_SHARED | libc::MAP_FIXED,
+//                self.vm.as_raw_fd(),
+//                mapoff,
+//            ) as *mut u8
+//        };
+        return Ok(true);
+
+    }
+
+    /// Gets the map offset for the device memory segment 'segid'.
+    ///
+    /// Returns Ok containing the offset if successful, and an Error otherwise.
+    fn get_devmem_offset(&self, segid: MemSegId) -> Result<i64, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut memseg_data = vm_devmem_offset {
+            segid: segid as i32,
+            ..Default::default()
+        };
+
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_DEVMEM_GETOFFSET, &mut memseg_data) };
+        if result == 0 {
+            return Ok(memseg_data.offset);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+
     /// Sets basic attributes of CPUs on the VirtualMachine: sockets, cores,
     /// threads, and maximum number of CPUs.
     pub fn set_topology(&self, sockets: u16, cores: u16, threads: u16, maxcpus: u16) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
         let top_data = vm_cpu_topology {
             sockets: sockets,
             cores: cores,
@@ -200,6 +400,32 @@ impl VirtualMachine {
             return Err(Error::last_os_error());
         }
     }
+}
+
+// Different styles of mapping the memory assigned to a VM into the address
+// space of the controlling process.
+#[repr(C)]
+#[allow(non_camel_case_types, unused)]
+#[derive(Debug, Copy, Clone)]
+enum vm_mmap_style {
+	VM_MMAP_NONE,		/* no mapping */
+	VM_MMAP_ALL,		/* fully and statically mapped */
+	VM_MMAP_SPARSE,		/* mappings created on-demand */
+}
+
+// 'flags' value passed to 'vm_set_memflags()'.
+const VM_MEM_F_INCORE: i32 = 0x01;    // include guest memory in core file
+const VM_MEM_F_WIRED: i32 = 0x02;	// guest memory is wired
+
+/// Identifiers for memory segments, both system memory and devmem segments.
+#[repr(C)]
+#[allow(non_camel_case_types, unused)]
+#[derive(Debug, Copy, Clone)]
+pub enum MemSegId{
+        VM_LOWMEM = 0,
+        VM_HIGHMEM = 1,
+        VM_BOOTROM = 2,
+        VM_FRAMEBUFFER = 3,
 }
 
 /// Reasons for virtual machine exits.
