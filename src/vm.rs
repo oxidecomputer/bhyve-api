@@ -1,11 +1,10 @@
 //! Bhyve virtual machine operations.
 
-use libc::{ioctl, open, O_RDWR};
+use libc::{ioctl, open, O_RDWR, c_void};
 use std::ffi::{CString, CStr};
 use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::ptr::null_mut;
 
 use crate::include::vmm::{vm_suspend_how};
 use crate::include::vmm_dev::*;
@@ -16,7 +15,7 @@ const GB: u64 = (1024 * MB);
 // Size of the guard region before and after the virtual address space
 // mapping the guest physical memory. This must be a multiple of the
 // superpage size for performance reasons.
-const VM_MMAP_GUARD_SIZE: usize = 4 * MB as usize;
+//const VM_MMAP_GUARD_SIZE: usize = 4 * MB as usize;
 
 /// The VirtualMachine module handles Bhyve virtual machine operations.
 /// It owns the filehandle for these operations.
@@ -197,31 +196,33 @@ impl VirtualMachine {
         }
     }
 
-    pub fn create_devmem(&self, segid: MemSegId, name: &str, len: usize) -> Result<bool, Error> {
+    pub fn add_devmem(&self, segid: MemSegId, name: &str, base: u64, len: usize) -> Result<bool, Error> {
         self.alloc_memseg(segid, len, name)?;
         let mapoff = self.get_devmem_offset(segid)?;
-        let len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
-        let base: *mut u8 = unsafe {
-            libc::mmap(
-                null_mut(),
-                len2,
-                libc::PROT_NONE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
-                -1,
-                0,
-            ) as *mut u8
-        };
 
-//        let ptr: *mut u8 = unsafe {
+//        let len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
+//        let base: *mut u8 = unsafe {
 //            libc::mmap(
-//                base + VM_MMAP_GUARD_SIZE,
-//                len,
-//                libc::PROT_READ | libc::PROT_WRITE,
-//                libc::MAP_SHARED | libc::MAP_FIXED,
-//                self.vm.as_raw_fd(),
-//                mapoff,
+//                null_mut(),
+//                len2,
+//                libc::PROT_NONE,
+//                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+//                -1,
+//                0,
 //            ) as *mut u8
 //        };
+
+        // mmap the devmem region in the host address space
+        let _ptr: *mut u8 = unsafe {
+            libc::mmap(
+                base as *mut c_void,
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED | libc::MAP_FIXED,
+                self.vm.as_raw_fd(),
+                mapoff,
+            ) as *mut u8
+        };
         return Ok(true);
 
     }
@@ -242,6 +243,21 @@ impl VirtualMachine {
         } else {
             return Err(Error::last_os_error());
         }
+    }
+
+    /// Sets up a memory segment for the bootrom
+    ///
+    /// Returns Ok if successful, and an Error otherwise.
+    pub fn setup_bootrom(&self, base: u64, len: usize) -> Result<bool, Error> {
+        // Map the bootrom into the host address space
+        self.add_devmem(MemSegId::VM_BOOTROM, "bootrom", base, len)?;
+
+        // Map the bootrom into the guest address space
+	let prot = libc::PROT_READ | libc::PROT_EXEC;
+	let gpa: u64 = (1 << 32) - len as u64;
+	self.mmap_memseg(gpa, MemSegId::VM_BOOTROM, 0, len, prot)?;
+
+        Ok(true)
     }
 
 
@@ -414,7 +430,7 @@ enum vm_mmap_style {
 }
 
 // 'flags' value passed to 'vm_set_memflags()'.
-const VM_MEM_F_INCORE: i32 = 0x01;    // include guest memory in core file
+//const VM_MEM_F_INCORE: i32 = 0x01;    // include guest memory in core file
 const VM_MEM_F_WIRED: i32 = 0x02;	// guest memory is wired
 
 /// Identifiers for memory segments, both system memory and devmem segments.
