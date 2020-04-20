@@ -22,7 +22,7 @@ const GB: u64 = (1024 * MB);
 pub struct VirtualMachine {
     vm: File,
     pub name: String,
-    pub lowmem_limit: u64,
+    pub lowmem_limit: usize,
     pub memflags: i32,
 }
 
@@ -46,7 +46,7 @@ impl VirtualMachine {
         Ok(VirtualMachine {
             vm: safe_handle,
             name: name.to_string(),
-            lowmem_limit: 3 * GB,
+            lowmem_limit: 3 * GB as usize,
             memflags: 0,
         })
     }
@@ -140,7 +140,6 @@ impl VirtualMachine {
             Ok(exists) => if exists.len != 0 {
                 // A memory segment already exists with the same segment ID as the one
                 // we are trying to allocate.
-                //let exists_name = CStr::from_bytes_with_nul(exists.name)?;
                 let r_name = unsafe { CStr::from_ptr(exists.name.as_ptr()) };
                 let exists_name = r_name.to_owned();
                 if exists.len == len && exists_name == c_name {
@@ -162,14 +161,18 @@ impl VirtualMachine {
             len: len,
             ..Default::default()
         };
-        // memseg_data.name.clone_from_slice(c_name.as_bytes_with_nul());
-        if name.len() >= memseg_data.name.len() {
-            // name is too long for vm_memseg struct
-            return Err(Error::from(ErrorKind::InvalidInput));
-        } else {
-            // Copy each character from the CString to the char array
-            for (to, from) in memseg_data.name.iter_mut().zip(c_name.as_bytes_with_nul()) {
-                *to = *from as i8;
+
+        let name_length = name.len();
+        if name_length > 0 {
+            // Don't copy the name if the string is empty (zero length)
+            if name_length >= memseg_data.name.len() {
+                // name is too long for vm_memseg struct
+                return Err(Error::from(ErrorKind::InvalidInput));
+            } else {
+                // Copy each character from the CString to the char array
+                for (to, from) in memseg_data.name.iter_mut().zip(c_name.as_bytes_with_nul()) {
+                    *to = *from as i8;
+                }
             }
         }
 
@@ -196,7 +199,7 @@ impl VirtualMachine {
         }
     }
 
-    pub fn add_devmem(&self, segid: MemSegId, name: &str, base: u64, len: usize) -> Result<bool, Error> {
+    fn add_devmem(&self, segid: MemSegId, name: &str, base: u64, len: usize) -> Result<bool, Error> {
         self.alloc_memseg(segid, len, name)?;
         let mapoff = self.get_devmem_offset(segid)?;
 
@@ -223,6 +226,32 @@ impl VirtualMachine {
                 mapoff,
             ) as *mut u8
         };
+        return Ok(true);
+
+    }
+
+    fn add_guest_memory(&self, segid: MemSegId, gpa: u64, base: u64, len: usize) -> Result<bool, Error> {
+        self.alloc_memseg(segid, len, "")?; // only devices name their memory regions
+
+        // Map the guest memory into the guest address space
+	let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
+	self.mmap_memseg(gpa, MemSegId::VM_LOWMEM, 0, len, prot)?;
+
+        // mmap into the process address space on the host
+        let ptr = unsafe {
+            libc::mmap(
+                base as *mut c_void,
+                len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED | libc::MAP_FIXED,
+                self.vm.as_raw_fd(),
+                0,
+            )
+        };
+        if ptr == libc::MAP_FAILED {
+            return Err(Error::from(ErrorKind::AddrNotAvailable));
+        }
+
         return Ok(true);
 
     }
@@ -256,6 +285,26 @@ impl VirtualMachine {
 	let prot = libc::PROT_READ | libc::PROT_EXEC;
 	let gpa: u64 = (1 << 32) - len as u64;
 	self.mmap_memseg(gpa, MemSegId::VM_BOOTROM, 0, len, prot)?;
+
+        Ok(true)
+    }
+
+    pub fn setup_lowmem(&self, base: u64, len: usize) -> Result<bool, Error> {
+        if len > self.lowmem_limit {
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
+
+	let gpa: u64 = 0;
+        // Map the guest memory into the host address space
+        self.add_guest_memory(MemSegId::VM_LOWMEM, gpa, base, len)?;
+
+        Ok(true)
+    }
+
+    pub fn setup_highmem(&self, base: u64, len: usize) -> Result<bool, Error> {
+	let gpa: u64 = 4 * GB;
+        // Map the guest memory into the host address space
+        self.add_guest_memory(MemSegId::VM_HIGHMEM, gpa, base, len)?;
 
         Ok(true)
     }
