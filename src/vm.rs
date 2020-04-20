@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::include::vmm::{vm_suspend_how};
+use crate::include::vmm::{vm_suspend_how, vm_exitcode};
 use crate::include::vmm_dev::*;
 
 const MB: u64 = (1024 * 1024);
@@ -355,9 +355,83 @@ impl VirtualMachine {
         if result == 0 {
             //let cid = run_data.cpuid;
             // println!("VCPU ID is {}", cid);
-            //let exitcode = run_data.vm_exit.exitcode;
-            //println!("Exit code is {}", exitcode);
-            return Ok(VmExit::Bogus);
+            match run_data.vm_exit.exitcode {
+                vm_exitcode::VM_EXITCODE_INOUT => {
+                    return Ok(VmExit::InOut);
+                }
+                vm_exitcode::VM_EXITCODE_VMX => {
+                    return Ok(VmExit::Vmx);
+                }
+                vm_exitcode::VM_EXITCODE_BOGUS => {
+                    return Ok(VmExit::Bogus);
+                }
+                vm_exitcode::VM_EXITCODE_RDMSR => {
+                    return Ok(VmExit::RdMsr);
+                }
+                vm_exitcode::VM_EXITCODE_WRMSR => {
+                    return Ok(VmExit::WrMsr);
+                }
+                vm_exitcode::VM_EXITCODE_HLT => {
+                    return Ok(VmExit::Halt);
+                }
+                vm_exitcode::VM_EXITCODE_MTRAP => {
+                    return Ok(VmExit::Mtrap);
+                }
+                vm_exitcode::VM_EXITCODE_PAUSE => {
+                    return Ok(VmExit::Pause);
+                }
+                vm_exitcode::VM_EXITCODE_PAGING => {
+                    return Ok(VmExit::Paging);
+                }
+                vm_exitcode::VM_EXITCODE_INST_EMUL => {
+                    return Ok(VmExit::InstEmul);
+                }
+                vm_exitcode::VM_EXITCODE_SPINUP_AP => {
+                    return Ok(VmExit::SpinupAp);
+                }
+                vm_exitcode::VM_EXITCODE_DEPRECATED1 => {
+                    return Ok(VmExit::Deprecated);
+                }
+                vm_exitcode::VM_EXITCODE_RUNBLOCK => {
+                    return Ok(VmExit::RunBlock);
+                }
+                vm_exitcode::VM_EXITCODE_IOAPIC_EOI => {
+                    return Ok(VmExit::IoApicEoi);
+                }
+                vm_exitcode::VM_EXITCODE_SUSPENDED => {
+                    return Ok(VmExit::Suspended);
+                }
+                vm_exitcode::VM_EXITCODE_INOUT_STR => {
+                    return Ok(VmExit::InOutStr);
+                }
+                vm_exitcode::VM_EXITCODE_TASK_SWITCH => {
+                    return Ok(VmExit::TaskSwitch);
+                }
+                vm_exitcode::VM_EXITCODE_MONITOR => {
+                    return Ok(VmExit::Monitor);
+                }
+                vm_exitcode::VM_EXITCODE_MWAIT => {
+                    return Ok(VmExit::Mwait);
+                }
+                vm_exitcode::VM_EXITCODE_SVM => {
+                    return Ok(VmExit::Svm);
+                }
+                vm_exitcode::VM_EXITCODE_REQIDLE => {
+                    return Ok(VmExit::ReqIdle);
+                }
+                vm_exitcode::VM_EXITCODE_DEBUG => {
+                    return Ok(VmExit::Debug);
+                }
+                vm_exitcode::VM_EXITCODE_VMINSN => {
+                    return Ok(VmExit::VmInsn);
+                }
+                vm_exitcode::VM_EXITCODE_HT => {
+                    return Ok(VmExit::Ht);
+                }
+                vm_exitcode::VM_EXITCODE_MAX => {
+                    return Ok(VmExit::Max);
+                }
+            }
         } else {
             return Err(Error::last_os_error());
         }
@@ -455,12 +529,24 @@ pub enum VmExit {
     Bogus,
     RdMsr,
     WrMsr,
-    Hlt,
+    Halt,
     Mtrap,
     Pause,
     Paging,
     InstEmul,
     SpinupAp,
-    Deprecated1,
+    Deprecated,
     RunBlock,
+    IoApicEoi,
+    Suspended,
+    InOutStr,
+    TaskSwitch,
+    Monitor,
+    Mwait,
+    Svm,
+    ReqIdle,
+    Debug,
+    VmInsn,
+    Ht,
+    Max,
 }
