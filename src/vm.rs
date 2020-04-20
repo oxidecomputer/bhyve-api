@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::include::vmm::{vm_suspend_how, vm_exitcode};
+use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state};
 use crate::include::vmm_dev::*;
 
 const MB: u64 = (1024 * 1024);
@@ -262,17 +262,16 @@ impl VirtualMachine {
 
 
     /// Sets basic attributes of CPUs on the VirtualMachine: sockets, cores,
-    /// threads, and maximum number of CPUs.
-    pub fn set_topology(&self, sockets: u16, cores: u16, threads: u16, maxcpus: u16) -> Result<bool, Error> {
+    /// and threads.
+    pub fn set_topology(&self, sockets: u16, cores: u16, threads: u16) -> Result<bool, Error> {
         // Struct is allocated (and owned) by Rust
         let top_data = vm_cpu_topology {
             sockets: sockets,
             cores: cores,
             threads: threads,
-            maxcpus: maxcpus,
+            maxcpus: 0, // any other value is invalid
         };
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_TOPOLOGY, &top_data) };
-        println!("Attempting to set CPU topology: sockets={}, cores={}, threads={}, maxcpus={}", top_data.sockets, top_data.cores, top_data.threads, top_data.maxcpus);
         if result == 0 {
             return Ok(true);
         } else {
@@ -315,6 +314,43 @@ impl VirtualMachine {
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_ACTIVATE_CPU, &cpu_data) };
         if result == 0 {
             return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn set_x2apic_state(&self, vcpu_id: i32, enable: bool) -> Result<bool, Error> {
+        let state = match enable {
+            true => x2apic_state::X2APIC_ENABLED,
+            false => x2apic_state::X2APIC_DISABLED
+        };
+
+        // Struct is allocated (and owned) by Rust
+        let x2apic_data = vm_x2apic {
+            cpuid: vcpu_id,
+            state: state,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_X2APIC_STATE, &x2apic_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn get_x2apic_state(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut x2apic_data = vm_x2apic {
+            cpuid: vcpu_id,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_X2APIC_STATE, &mut x2apic_data) };
+        if result == 0 {
+            match x2apic_data.state {
+                x2apic_state::X2APIC_ENABLED => return Ok(true),
+                x2apic_state::X2APIC_DISABLED => return Ok(false),
+                x2apic_state::X2APIC_STATE_LAST => return Err(Error::from(ErrorKind::InvalidData)),
+            }
         } else {
             return Err(Error::last_os_error());
         }

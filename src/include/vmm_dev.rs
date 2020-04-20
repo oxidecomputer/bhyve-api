@@ -149,6 +149,9 @@ pub const VM_MMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MMAP_M
 pub const VM_MMAP_GETNEXT: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_MMAP_GETNEXT as c_uint, (size_of::<vm_memmap>() as c_uint));
 pub const VM_MUNMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MUNMAP_MEMSEG as c_uint, (size_of::<vm_munmap>() as c_uint));
 
+pub const VM_SET_X2APIC_STATE: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_X2APIC_STATE as c_uint, (size_of::<vm_x2apic>() as c_uint));
+pub const VM_GET_X2APIC_STATE: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_X2APIC_STATE as c_uint, (size_of::<vm_x2apic>() as c_uint));
+
 pub const VM_SET_TOPOLOGY: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_TOPOLOGY as c_uint, (size_of::<vm_cpu_topology>() as c_uint));
 pub const VM_GET_TOPOLOGY: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_GET_TOPOLOGY as c_uint, (size_of::<vm_cpu_topology>() as c_uint));
 pub const VM_STATS_IOC: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_VM_STATS as c_uint, (size_of::<vm_stats>() as c_uint));
@@ -235,6 +238,23 @@ struct vm_register {
 pub struct vm_run {
     pub cpuid: c_int,
     pub vm_exit: vm_exit,
+}
+
+// For VM_GET_X2APIC_STATE and VM_SET_X2APIC_STATE
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct vm_x2apic {
+    pub cpuid: c_int,
+    pub state: x2apic_state,
+}
+
+impl Default for vm_x2apic {
+    fn default() -> vm_x2apic {
+        vm_x2apic {
+            cpuid: 0,
+            state: x2apic_state::X2APIC_DISABLED,
+        }
+    }
 }
 
 // For VM_SUSPEND

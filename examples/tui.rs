@@ -8,6 +8,8 @@ use std::env;
 use bhyve_api::system::*;
 use bhyve_api::vm::*;
 
+const BSP: i32 = 0;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if "create" == &args[1] {
@@ -49,13 +51,20 @@ fn cmd_run_vm(vm_name: &str) {
     let vm = VirtualMachine::new(vm_name).expect("failed to open filehandle to VM device");
     println!("Opened a filehandle to /dev/vmm/{}", vm.name);
 
-    match vm.set_topology(1, 1, 1, 2) {
+    match vm.set_topology(1, 1, 1) {
         Ok(_) => println!("Set CPU topology for VM at /dev/vmm/{}", vm_name),
         Err(e) => println!("Failed to set CPU topology for VM at /dev/vmm/{}, with error: {}", vm_name, e),
     };
 
     let (sockets, cores, threads, maxcpus) = vm.get_topology().expect("failed to get CPU topology for VM");
     println!("CPU topology current values: sockets={}, cores={}, threads={}, maxcpus={}", sockets, cores, threads, maxcpus);
+
+    vm.set_x2apic_state(BSP, false).expect("failed to disable x2APIC");
+
+    match vm.get_x2apic_state(BSP).expect("failed to get x2APIC state") {
+        true => println!("x2APIC enabled"),
+        false => println!("x2APIC disabled"),
+    }
 
     match vm.run(0) {
         Ok(_) => println!("Successful run for VM at /dev/vmm/{}", vm_name),

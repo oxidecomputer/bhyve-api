@@ -72,6 +72,15 @@ pub enum vm_reg_name {
         VM_REG_LAST
 }
 
+#[repr(C)]
+#[allow(non_camel_case_types, unused)]
+#[derive(Copy, Clone)]
+pub enum x2apic_state {
+	X2APIC_DISABLED,
+	X2APIC_ENABLED,
+	X2APIC_STATE_LAST
+}
+
 
 // The 'access' field has the format specified in Table 21-2 of the Intel
 // Architecture Manual vol 3b.
