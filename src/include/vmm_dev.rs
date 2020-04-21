@@ -161,6 +161,11 @@ pub const VM_ACTIVATE_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_ACTIV
 pub const VM_SUSPEND_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SUSPEND_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
 pub const VM_RESUME_CPU: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RESUME_CPU as c_uint, (size_of::<vm_activate_cpu>() as c_uint));
 
+pub const VM_RTC_WRITE: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RTC_WRITE as c_uint, (size_of::<vm_rtc_data>() as c_uint));
+pub const VM_RTC_READ: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RTC_READ as c_uint, (size_of::<vm_rtc_data>() as c_uint));
+pub const VM_RTC_SETTIME: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RTC_SETTIME as c_uint, (size_of::<vm_rtc_time>() as c_uint));
+pub const VM_RTC_GETTIME: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_RTC_GETTIME as c_uint, (size_of::<vm_rtc_time>() as c_uint));
+
 pub const VM_DEVMEM_GETOFFSET: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_DEVMEM_GETOFFSET as c_uint, (size_of::<vm_devmem_offset>() as c_uint));
 
 
@@ -213,6 +218,21 @@ impl Default for vm_memseg {
             name: [0 as c_char; SPECNAMELEN + 1],
         }
     }
+}
+
+// For VM_RTC_SETTIME and VM_RTC_GETTIME
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_rtc_time {
+    pub secs: c_longlong,
+}
+
+// For VM_RTC_WRITE and VM_RTC_READ
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_rtc_data {
+    pub offset: c_int,
+    pub value: u8,
 }
 
 // For VM_DEVMEM_GETOFFSET

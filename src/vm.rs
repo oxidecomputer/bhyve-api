@@ -310,6 +310,58 @@ impl VirtualMachine {
     }
 
 
+    pub fn rtc_write(&self, offset: i32, value: u8) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let rtc_data = vm_rtc_data {
+            offset: offset,
+            value: value,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RTC_WRITE, &rtc_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn rtc_read(&self, offset: i32) -> Result<u8, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut rtc_data = vm_rtc_data {
+            offset: offset,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RTC_READ, &mut rtc_data) };
+        if result == 0 {
+            return Ok(rtc_data.value);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn rtc_settime(&self, secs: i64) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let rtc_data = vm_rtc_time {
+            secs: secs,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RTC_SETTIME, &rtc_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    pub fn rtc_gettime(&self) -> Result<i64, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut rtc_data = vm_rtc_time::default();
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RTC_GETTIME, &mut rtc_data) };
+        if result == 0 {
+            return Ok(rtc_data.secs);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
     /// Sets basic attributes of CPUs on the VirtualMachine: sockets, cores,
     /// and threads.
     pub fn set_topology(&self, sockets: u16, cores: u16, threads: u16) -> Result<bool, Error> {
