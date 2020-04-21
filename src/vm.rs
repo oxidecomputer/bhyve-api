@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state};
+use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state, vm_cap_type};
 use crate::include::vmm_dev::*;
 
 const MB: u64 = (1024 * 1024);
@@ -623,6 +623,39 @@ impl VirtualMachine {
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_REINIT) };
         if result == 0 {
             return Ok(result);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Get the value of an optional capability on the VCPU
+    pub fn get_capability(&self, vcpu_id: i32, cap: vm_cap_type) -> Result<i32, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut cap_data = vm_capability {
+            cpuid: vcpu_id,
+            captype: cap,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_CAPABILITY, &mut cap_data) };
+        if result == 0 {
+            return Ok(cap_data.capval);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Set the value of an optional capability on the VCPU
+    pub fn set_capability(&self, vcpu_id: i32, cap: vm_cap_type, val: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let cap_data = vm_capability {
+            cpuid: vcpu_id,
+            captype: cap,
+            capval: val,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_CAPABILITY, &cap_data) };
+        if result == 0 {
+            return Ok(true);
         } else {
             return Err(Error::last_os_error());
         }

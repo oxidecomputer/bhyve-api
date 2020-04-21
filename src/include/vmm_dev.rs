@@ -149,6 +149,9 @@ pub const VM_MMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MMAP_M
 pub const VM_MMAP_GETNEXT: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_MMAP_GETNEXT as c_uint, (size_of::<vm_memmap>() as c_uint));
 pub const VM_MUNMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MUNMAP_MEMSEG as c_uint, (size_of::<vm_munmap>() as c_uint));
 
+pub const VM_SET_CAPABILITY: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
+pub const VM_GET_CAPABILITY: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
+
 pub const VM_SET_X2APIC_STATE: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_X2APIC_STATE as c_uint, (size_of::<vm_x2apic>() as c_uint));
 pub const VM_GET_X2APIC_STATE: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_X2APIC_STATE as c_uint, (size_of::<vm_x2apic>() as c_uint));
 
@@ -258,6 +261,27 @@ struct vm_register {
 pub struct vm_run {
     pub cpuid: c_int,
     pub vm_exit: vm_exit,
+}
+
+// For VM_SET_CAPABILITY and VM_GET_CAPABILITY
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct vm_capability {
+    pub cpuid: c_int,
+    pub captype: vm_cap_type, // enum vm_cap_type
+    pub capval: c_int,
+    pub allcpus: c_int,
+}
+
+impl Default for vm_capability {
+    fn default() -> vm_capability {
+        vm_capability {
+            cpuid: 0,
+            captype: vm_cap_type::VM_CAP_MAX,
+            capval: 0,
+            allcpus: 0,
+        }
+    }
 }
 
 // For VM_GET_X2APIC_STATE and VM_SET_X2APIC_STATE

@@ -81,13 +81,25 @@ pub enum x2apic_state {
 	X2APIC_STATE_LAST
 }
 
+// Identifiers for optional vmm capabilities
+#[repr(C)]
+#[allow(non_camel_case_types, unused)]
+#[derive(Copy, Clone)]
+pub enum vm_cap_type {
+	VM_CAP_HALT_EXIT,
+	VM_CAP_MTRAP_EXIT,
+	VM_CAP_PAUSE_EXIT,
+	VM_CAP_UNRESTRICTED_GUEST,
+	VM_CAP_ENABLE_INVPCID,
+	VM_CAP_MAX
+}
+
 
 // The 'access' field has the format specified in Table 21-2 of the Intel
 // Architecture Manual vol 3b.
 //
 // XXX The contents of the 'access' field are architecturally defined except
 // bit 16 - Segment Unusable.
-
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct seg_desc {
