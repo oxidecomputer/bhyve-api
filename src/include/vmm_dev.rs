@@ -149,6 +149,9 @@ pub const VM_MMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MMAP_M
 pub const VM_MMAP_GETNEXT: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_MMAP_GETNEXT as c_uint, (size_of::<vm_memmap>() as c_uint));
 pub const VM_MUNMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MUNMAP_MEMSEG as c_uint, (size_of::<vm_munmap>() as c_uint));
 
+pub const VM_SET_REGISTER: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_REGISTER as c_uint, (size_of::<vm_register>() as c_uint));
+pub const VM_GET_REGISTER: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_REGISTER as c_uint, (size_of::<vm_register>() as c_uint));
+
 pub const VM_SET_CAPABILITY: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
 pub const VM_GET_CAPABILITY: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
 
@@ -249,7 +252,7 @@ pub struct vm_devmem_offset {
 // For VM_SET_REGISTER and VM_GET_REGISTER
 #[repr(C)]
 #[derive(Copy, Clone, Default)]
-struct vm_register {
+pub struct vm_register {
     pub cpuid: c_int,
     pub regnum: c_int,      // enum vm_reg_name
     pub regval: c_ulonglong,

@@ -310,6 +310,38 @@ impl VirtualMachine {
     }
 
 
+    /// Set the value of a single register on the VCPU
+    pub fn set_register(&self, vcpu_id: i32, reg: i32, val: u64) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let reg_data = vm_register {
+            cpuid: vcpu_id,
+            regnum: reg,
+            regval: val,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_REGISTER, &reg_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Get the value of a single register on the VCPU
+    pub fn get_register(&self, vcpu_id: i32, reg: i32) -> Result<u64, Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut reg_data = vm_register {
+            cpuid: vcpu_id,
+            regnum: reg,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_REGISTER, &mut reg_data) };
+        if result == 0 {
+            return Ok(reg_data.regval);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
     pub fn rtc_write(&self, offset: i32, value: u8) -> Result<bool, Error> {
         // Struct is allocated (and owned) by Rust
         let rtc_data = vm_rtc_data {
