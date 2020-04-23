@@ -13,16 +13,11 @@ use std::io::Write;
 use std::slice;
 use std::ptr::null_mut;
 
-const MB: u64 = (1024 * 1024);
-//const GB: u64 = (1024 * MB);
-//const MAX_BOOTROM_SIZE: i32 = 16 * MB;
-
 const BSP: i32 = 0;
 
 fn main() {
     let vm_name = "helloworld";
-    let bootrom_size: usize = 0x1000;
-    let guest_mem_size: usize = MB as usize;
+    let mem_size: usize = 0x4000;
     let asm_code: &[u8] = &[
         0xba, 0xf8, 0x03, /* mov $0x3f8, %dx */
         0x00, 0xd8,       /* add %bl, %al */
@@ -33,28 +28,16 @@ fn main() {
     ];
 
 
-    let guest_mem_addr: *mut u8 = unsafe {
+    let host_addr: *mut u8 = unsafe {
         libc::mmap(
             null_mut(),
-            guest_mem_size,
-            libc::PROT_NONE,
-            libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_NORESERVE,
-            -1,
-            0,
-        ) as *mut u8
-    };
-
-    let bootrom_addr: *mut u8 = unsafe {
-        libc::mmap(
-            null_mut(),
-            bootrom_size,
+            mem_size,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_NORESERVE,
             -1,
             0,
         ) as *mut u8
     };
-
 
     let vmmctl = VMMSystem::new().expect("failed to create VMM system ioctl handle");
     println!("Opened a filehandle to /dev/vmmctl");
@@ -67,40 +50,45 @@ fn main() {
     vm.set_topology(1, 1, 1).expect("failed to set CPU topology");
     vm.set_x2apic_state(BSP, false).expect("failed to disable x2APIC");
 
-    vm.setup_lowmem(guest_mem_addr as u64, guest_mem_size).expect("failed to set guest memory");
-    vm.setup_bootrom(bootrom_addr as u64, bootrom_size).expect("failed to set bootrom memory");
+    vm.setup_lowmem(host_addr as u64, mem_size).expect("failed to set guest memory");
 
-    // Write the x86 assembly code in the guest bootrom memory.
+    // Write the x86 assembly code in the guest memory.
     unsafe {
-        let mut slice = slice::from_raw_parts_mut(bootrom_addr, bootrom_size);
+        let mut slice = slice::from_raw_parts_mut(host_addr, mem_size);
         slice.write(&asm_code).unwrap();
     }
 
+    let rip = vm.get_register(BSP, vm_reg_name::VM_REG_GUEST_RIP).unwrap();
+    println!("RIP reg is {}", rip);
+
     // Setup registers
-//    let mut vcpu_sregs = vcpu_fd.get_sregs().unwrap();
-//    vcpu_sregs.cs.base = 0;
-//    vcpu_sregs.cs.selector = 0;
-//    vcpu_fd.set_sregs(&vcpu_sregs).unwrap();
+    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_CS, 0).expect("failed to set CS register");
 
-//    let mut vcpu_regs = vcpu_fd.get_regs().unwrap();
-//    vcpu_regs.rip = guest_addr;
-//    vcpu_regs.rax = 2;
-//    vcpu_regs.rbx = 3;
-//    vcpu_regs.rflags = 2;
-//    vcpu_fd.set_regs(&vcpu_regs).unwrap();
+    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RAX, 2).expect("failed to set RAX register");
+    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RBX, 3).expect("failed to set RBX register");
+    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RFLAGS, 3).expect("failed to set RFLAGS register");
 
-//    loop {
-//        match vm.run(1).expect("failed to run VM") {
-//            VmExit::InOut => {
-//                println!("exit for InOut");
-//            }
-//            VmExit::Halt => {
-//                println!("exit for Halt");
-//                break;
-//            }
-//            reason => println!("Unhandled exit reason {:?}", reason)
-//        }
-//    }
+    match vm.activate_vcpu(BSP) {
+        Ok(_) => println!("Activated CPU 0 for VM at /dev/vmm/{}", vm_name),
+        Err(e) => println!("Failed to activate CPU 0 for VM at /dev/vmm/{}, with error: {}", vm_name, e),
+    };
+
+    loop {
+        match vm.run(BSP).expect("failed to run VM") {
+            VmExit::InOut => {
+                println!("exit for InOut");
+            }
+            VmExit::Vmx => {
+                println!("exit for Vmx");
+                break;
+            }
+            VmExit::Halt => {
+                println!("exit for Halt");
+                break;
+            }
+            reason => println!("Unhandled exit reason {:?}", reason)
+        }
+    }
 
 
     vmmctl.destroy_vm(vm_name).expect("failed to destroy VM");
