@@ -6,7 +6,8 @@ use std::fs::File;
 use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state, vm_cap_type};
+pub use crate::include::vmm::{vm_cap_type, vm_reg_name};
+use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state};
 use crate::include::vmm_dev::*;
 
 const MB: u64 = (1024 * 1024);
@@ -311,11 +312,11 @@ impl VirtualMachine {
 
 
     /// Set the value of a single register on the VCPU
-    pub fn set_register(&self, vcpu_id: i32, reg: i32, val: u64) -> Result<bool, Error> {
+    pub fn set_register(&self, vcpu_id: i32, reg: vm_reg_name, val: u64) -> Result<bool, Error> {
         // Struct is allocated (and owned) by Rust
         let reg_data = vm_register {
             cpuid: vcpu_id,
-            regnum: reg,
+            regnum: reg as i32,
             regval: val,
         };
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_REGISTER, &reg_data) };
@@ -327,11 +328,11 @@ impl VirtualMachine {
     }
 
     /// Get the value of a single register on the VCPU
-    pub fn get_register(&self, vcpu_id: i32, reg: i32) -> Result<u64, Error> {
+    pub fn get_register(&self, vcpu_id: i32, reg: vm_reg_name) -> Result<u64, Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
         let mut reg_data = vm_register {
             cpuid: vcpu_id,
-            regnum: reg,
+            regnum: reg as i32,
             ..Default::default()
         };
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_REGISTER, &mut reg_data) };
