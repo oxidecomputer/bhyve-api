@@ -624,6 +624,10 @@ impl VirtualMachine {
                     let io = unsafe { run_data.vm_exit.u.inout };
                     let port = io.port;
                     let eax = io.eax;
+                    println!("bitfield bytes is {}", io.bytes());
+                    println!("bitfield in is {}", io.is_rep());
+                    println!("bitfield string is {}", io.is_string());
+                    println!("bitfield rep is {}", io.is_rep());
                     return Ok(VmExit::InOut(port, eax));
                 }
                 vm_exitcode::VM_EXITCODE_VMX => {

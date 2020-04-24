@@ -210,9 +210,44 @@ pub enum vm_exitcode {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct vm_inout {
-    bitfields: u8,
+    bitfields: u16,
     pub port: u16,
     pub eax: u32,
+}
+
+impl vm_inout {
+    pub fn bytes(&self) -> u16 {
+        // We only care about the first three bits of the bitfield
+        let bytes = self.bitfields & 0b0111;
+        return bytes;
+    }
+    pub fn is_in(&self) -> bool {
+        // We only care about the fourth bit of the bitfield
+        let mask: u16 = 0b01000;
+        if (self.bitfields & mask) == mask {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    pub fn is_string(&self) -> bool {
+        // We only care about the fifth bit of the bitfield
+        let mask: u16 = 0b010000;
+        if (self.bitfields & mask) == mask {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    pub fn is_rep(&self) -> bool {
+        // We only care about the sixth bit of the bitfield
+        let mask: u16 = 0b0100000;
+        if (self.bitfields & mask) == mask {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
 
 #[repr(C)]
