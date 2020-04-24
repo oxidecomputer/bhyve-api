@@ -18,10 +18,11 @@ const BSP: i32 = 0;
 const RTC_LMEM_LSB: i32 = 0x34;
 const RTC_LMEM_MSB: i32 = 0x35;
 
-const MB: usize = (1024 * 1024);
+const KB: usize = 1024;
+const MB: usize = (1024 * KB);
 
-const m_64KB: usize = (64*1024);
-const m_16MB: usize = (16*1024*1024);
+const m_64KB: usize = (64*KB);
+const m_16MB: usize = (16*MB);
 
 
 
@@ -86,8 +87,6 @@ fn main() {
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RAX, 2).expect("failed to set RAX register");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RBX, 3).expect("failed to set RBX register");
 
-    let rip = vm.get_register(BSP, vm_reg_name::VM_REG_GUEST_RIP).unwrap();
-    println!("RIP reg is {}", rip);
 
     match vm.activate_vcpu(BSP) {
         Ok(_) => println!("Activated CPU 0 for VM at /dev/vmm/{}", vm_name),
@@ -95,6 +94,9 @@ fn main() {
     };
 
     loop {
+        let rip = vm.get_register(BSP, vm_reg_name::VM_REG_GUEST_RIP).unwrap();
+        println!("RIP reg before run is {}", rip);
+
         match vm.run(BSP).expect("failed to run VM") {
             VmExit::InOut(port, eax) => {
                 println!("exit for InOut, port={}, eax={}", port, eax);
@@ -102,9 +104,15 @@ fn main() {
                     println!("Got expected result, ASCII code for the number 5");
                 }
             }
+            VmExit::InOutStr(port, eax) => {
+                println!("exit for InOutStr, port={}, eax={}", port, eax);
+            }
             VmExit::Vmx(s, r, q, t, e) => {
-                println!("exit for Vmx, source={}, reason={}, qualification={}, inst type={}, inst error={}", s, r, q, t, e);
-                //break;
+                println!("exit for Vmx, source={}, reason={}, qualification={:b}, inst type={}, inst error={}", s, r, q, t, e);
+                if r == 2 {
+                    println!("Exit reason is triple fault");
+                    break;
+                }
             }
             VmExit::Bogus => {
                 println!("exit for Bogus");
