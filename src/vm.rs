@@ -7,8 +7,9 @@ use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub use crate::include::vmm::{vm_cap_type, vm_reg_name};
-use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state};
+use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state, seg_desc};
 use crate::include::vmm_dev::*;
+use crate::include::specialreg::{CR0_NE};
 
 const MB: u64 = (1024 * 1024);
 const GB: u64 = (1024 * MB);
@@ -310,6 +311,37 @@ impl VirtualMachine {
         Ok(true)
     }
 
+    /// Set the base, limit, and access values of a descriptor register on the VCPU
+    pub fn set_desc(&self, vcpu_id: i32, reg: vm_reg_name, base: u64, limit: u32, access: u32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let seg_data = vm_seg_desc {
+            cpuid: vcpu_id,
+            regnum: reg as i32,
+            desc: seg_desc {base: base, limit: limit, access: access},
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_SEGMENT_DESCRIPTOR, &seg_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
+
+    /// Get the base, limit, and access values of a descriptor register on the VCPU
+    pub fn get_desc(&self, vcpu_id: i32, reg: vm_reg_name) -> Result<(u64, u32, u32), Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut seg_data = vm_seg_desc {
+            cpuid: vcpu_id,
+            regnum: reg as i32,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_SEGMENT_DESCRIPTOR, &mut seg_data) };
+        if result == 0 {
+            return Ok((seg_data.desc.base, seg_data.desc.limit, seg_data.desc.access));
+        } else {
+            return Err(Error::last_os_error());
+        }
+    }
 
     /// Set the value of a single register on the VCPU
     pub fn set_register(&self, vcpu_id: i32, reg: vm_reg_name, val: u64) -> Result<bool, Error> {
@@ -488,6 +520,66 @@ impl VirtualMachine {
         } else {
             return Err(Error::last_os_error());
         }
+    }
+
+    /// From Intel Vol 3a:
+    /// Table 9-1. IA-32 Processor States Following Power-up, Reset or INIT
+    pub fn vcpu_reset(&self, vcpu_id: i32) -> Result<bool, Error> {
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RFLAGS, 0x2)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RIP, 0xfff0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_CR0, CR0_NE)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_CR3, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_CR4, 0)?;
+
+        // CS: present, r/w, accessed, 16-bit, byte granularity, usable
+	let cs_base = 0xffff0000;
+	let cs_limit = 0xffff;
+	let cs_access = 0x0093;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_CS, cs_base, cs_limit, cs_access)?;
+
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_CS, 0xf000)?;
+
+
+        // SS,DS,ES,FS,GS: present, r/w, accessed, 16-bit, byte granularity
+	let desc_base = 0;
+	let desc_limit = 0xffff;
+	let desc_access = 0x0093;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_SS, desc_base, desc_limit, desc_access)?;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_DS, desc_base, desc_limit, desc_access)?;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_ES, desc_base, desc_limit, desc_access)?;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_FS, desc_base, desc_limit, desc_access)?;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_GS, desc_base, desc_limit, desc_access)?;
+
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_SS, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_DS, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_ES, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_FS, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_GS, 0)?;
+
+        // General purpose registers
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RAX, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RBX, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RCX, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RDX, 0xf00)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RSI, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RDI, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RBP, 0)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_RSP, 0)?;
+
+
+        // GDTR, IDTR
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_GDTR, 0, 0xffff, 0)?;
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_IDTR, 0, 0xffff, 0)?;
+
+        // TR
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_TR, 0, 0, 0x0000008b)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_TR, 0)?;
+
+        // LDTR
+        self.set_desc(vcpu_id, vm_reg_name::VM_REG_GUEST_LDTR, 0, 0xffff, 0x00000082)?;
+        self.set_register(vcpu_id, vm_reg_name::VM_REG_GUEST_LDTR, 0)?;
+
+        Ok(true)
     }
 
     /// Suspends a Virtual CPU on the VirtualMachine.

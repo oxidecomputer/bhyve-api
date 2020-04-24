@@ -81,12 +81,11 @@ fn main() {
     }
 
     // Setup registers
-    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_CS, 0).expect("failed to set CS register");
+    vm.vcpu_reset(BSP).expect("failed to set initial state of registers");
 
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RIP, guest_addr as u64).expect("failed to set RIP register");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RAX, 2).expect("failed to set RAX register");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RBX, 3).expect("failed to set RBX register");
-    vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RFLAGS, 0x2).expect("failed to set RFLAGS register");
 
     let rip = vm.get_register(BSP, vm_reg_name::VM_REG_GUEST_RIP).unwrap();
     println!("RIP reg is {}", rip);

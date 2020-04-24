@@ -151,6 +151,8 @@ pub const VM_MUNMAP_MEMSEG: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_MUNM
 
 pub const VM_SET_REGISTER: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_REGISTER as c_uint, (size_of::<vm_register>() as c_uint));
 pub const VM_GET_REGISTER: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_REGISTER as c_uint, (size_of::<vm_register>() as c_uint));
+pub const VM_SET_SEGMENT_DESCRIPTOR: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_SEGMENT_DESCRIPTOR as c_uint, (size_of::<vm_seg_desc>() as c_uint));
+pub const VM_GET_SEGMENT_DESCRIPTOR: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_SEGMENT_DESCRIPTOR as c_uint, (size_of::<vm_seg_desc>() as c_uint));
 
 pub const VM_SET_CAPABILITY: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
 pub const VM_GET_CAPABILITY: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_CAPABILITY as c_uint, (size_of::<vm_capability>() as c_uint));
@@ -256,6 +258,16 @@ pub struct vm_register {
     pub cpuid: c_int,
     pub regnum: c_int,      // enum vm_reg_name
     pub regval: c_ulonglong,
+}
+
+// For VM_SET_SEGMENT_DESCRIPTOR and VM_GET_SEGMENT_DESCRIPTOR
+// data or code segment
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_seg_desc {
+    pub cpuid: c_int,
+    pub regnum: c_int,      // enum vm_reg_name
+    pub desc: seg_desc,     // struct seg_desc
 }
 
 // For VM_RUN

@@ -101,11 +101,11 @@ pub enum vm_cap_type {
 // XXX The contents of the 'access' field are architecturally defined except
 // bit 16 - Segment Unusable.
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct seg_desc {
-    base: c_ulonglong,
-    limit: c_uint,
-    access: c_uint,
+    pub base: c_ulonglong,
+    pub limit: c_uint,
+    pub access: c_uint,
 }
 
 #[repr(C)]
