@@ -625,7 +625,7 @@ impl VirtualMachine {
                     let port = io.port;
                     let eax = io.eax;
                     println!("bitfield bytes is {}", io.bytes());
-                    println!("bitfield in is {}", io.is_rep());
+                    println!("bitfield in is {}", io.is_in());
                     println!("bitfield string is {}", io.is_string());
                     println!("bitfield rep is {}", io.is_rep());
                     return Ok(VmExit::InOut(port, eax));
@@ -678,7 +678,14 @@ impl VirtualMachine {
                     return Ok(VmExit::Suspended);
                 }
                 vm_exitcode::VM_EXITCODE_INOUT_STR => {
-                    return Ok(VmExit::InOutStr);
+                    let io = unsafe { run_data.vm_exit.u.inout_str.inout };
+                    let port = io.port;
+                    let eax = io.eax;
+                    println!("bitfield bytes is {}", io.bytes());
+                    println!("bitfield in is {}", io.is_in());
+                    println!("bitfield string is {}", io.is_string());
+                    println!("bitfield rep is {}", io.is_rep());
+                    return Ok(VmExit::InOutStr(port, eax));
                 }
                 vm_exitcode::VM_EXITCODE_TASK_SWITCH => {
                     return Ok(VmExit::TaskSwitch);
@@ -848,7 +855,7 @@ pub enum VmExit {
     RunBlock,
     IoApicEoi,
     Suspended,
-    InOutStr,
+    InOutStr(u16 /* port */, u32 /* eax */),
     TaskSwitch,
     Monitor,
     Mwait,

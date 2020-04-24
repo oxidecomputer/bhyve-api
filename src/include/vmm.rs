@@ -252,15 +252,15 @@ impl vm_inout {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct vm_inout_str {
-    inout: vm_inout, // must be the first element
-    paging: vm_guest_paging,
-    rflags: c_ulonglong,
-    cr0: c_ulonglong,
-    index: c_ulonglong,
-    count: c_ulonglong,
-    segname: vm_reg_name,
-    seg_desc: seg_desc,
+pub struct vm_inout_str {
+    pub inout: vm_inout, // must be the first element
+    pub paging: vm_guest_paging,
+    pub rflags: c_ulonglong,
+    pub cr0: c_ulonglong,
+    pub index: c_ulonglong,
+    pub count: c_ulonglong,
+    pub segname: vm_reg_name,
+    pub seg_desc: seg_desc,
 }
 
 #[repr(C)]
@@ -297,7 +297,7 @@ impl Default for vm_exit {
     fn default() -> vm_exit {
         let payload = vm_exit_payload { empty: 0 };
         vm_exit {
-            exitcode: vm_exitcode::VM_EXITCODE_BOGUS,
+            exitcode: vm_exitcode::VM_EXITCODE_MAX,
             inst_length: 0,
             rip: 0,
             u: payload
@@ -309,7 +309,7 @@ impl Default for vm_exit {
 #[derive(Copy, Clone)]
 pub union vm_exit_payload {
     pub inout: vm_inout,
-    inout_str: vm_inout_str,
+    pub inout_str: vm_inout_str,
     pub paging: vm_exit_paging,
     pub inst_emul: vm_exit_inst_emul,
     pub vmx: vm_exit_vmx,
