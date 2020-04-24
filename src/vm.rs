@@ -523,14 +523,21 @@ impl VirtualMachine {
         };
         let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RUN, &mut run_data) };
         if result == 0 {
-            //let cid = run_data.cpuid;
-            // println!("VCPU ID is {}", cid);
+            let rip = run_data.vm_exit.rip;
+            println!("RIP after run is {}", rip);
+            let cid = run_data.cpuid;
+            println!("VCPU ID is {}", cid);
             match run_data.vm_exit.exitcode {
                 vm_exitcode::VM_EXITCODE_INOUT => {
                     return Ok(VmExit::InOut);
                 }
                 vm_exitcode::VM_EXITCODE_VMX => {
-                    return Ok(VmExit::Vmx);
+                    let status = unsafe { run_data.vm_exit.u.vmx.status };
+                    let reason = unsafe { run_data.vm_exit.u.vmx.exit_reason };
+                    let qual = unsafe { run_data.vm_exit.u.vmx.exit_qualification };
+                    let inst_type = unsafe { run_data.vm_exit.u.vmx.inst_type };
+                    let inst_error = unsafe { run_data.vm_exit.u.vmx.inst_error };
+                    return Ok(VmExit::Vmx(status, reason, qual, inst_type, inst_error));
                 }
                 vm_exitcode::VM_EXITCODE_BOGUS => {
                     return Ok(VmExit::Bogus);
@@ -728,7 +735,7 @@ pub enum MemSegId{
 #[derive(Debug, Copy, Clone)]
 pub enum VmExit {
     InOut,
-    Vmx,
+    Vmx(i32 /* status */, u32 /* exit reason */, u64 /* exit qualification */, i32 /* instruction type */, i32 /* instruction error */),
     Bogus,
     RdMsr,
     WrMsr,
