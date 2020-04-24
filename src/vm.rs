@@ -621,7 +621,10 @@ impl VirtualMachine {
             println!("VCPU ID is {}", cid);
             match run_data.vm_exit.exitcode {
                 vm_exitcode::VM_EXITCODE_INOUT => {
-                    return Ok(VmExit::InOut);
+                    let io = unsafe { run_data.vm_exit.u.inout };
+                    let port = io.port;
+                    let eax = io.eax;
+                    return Ok(VmExit::InOut(port, eax));
                 }
                 vm_exitcode::VM_EXITCODE_VMX => {
                     let status = unsafe { run_data.vm_exit.u.vmx.status };
@@ -826,7 +829,7 @@ pub enum MemSegId{
 ///
 #[derive(Debug, Copy, Clone)]
 pub enum VmExit {
-    InOut,
+    InOut(u16 /* port */, u32 /* eax */),
     Vmx(i32 /* status */, u32 /* exit reason */, u64 /* exit qualification */, i32 /* instruction type */, i32 /* instruction error */),
     Bogus,
     RdMsr,

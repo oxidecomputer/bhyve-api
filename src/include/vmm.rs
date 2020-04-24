@@ -209,10 +209,10 @@ pub enum vm_exitcode {
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-struct vm_inout {
-    bitfields: u8, // This is two bits too large
-    port: u16,
-    eax: u32,
+pub struct vm_inout {
+    bitfields: u8,
+    pub port: u16,
+    pub eax: u32,
 }
 
 #[repr(C)]
@@ -273,7 +273,7 @@ impl Default for vm_exit {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union vm_exit_payload {
-    inout: vm_inout,
+    pub inout: vm_inout,
     inout_str: vm_inout_str,
     pub paging: vm_exit_paging,
     pub inst_emul: vm_exit_inst_emul,

@@ -34,8 +34,8 @@ fn main() {
         0x00, 0xd8,       /* add %bl, %al */
         0x04, b'0',       /* add $'0', %al */
         0xee,             /* out %al, %dx */
-        0xb0, 0x0a,       /* mov $'\n', %al */
-        0xee,             /* out %al, %dx */
+//        0xb0, 0x0a,       /* mov $'\n', %al */
+//        0xee,             /* out %al, %dx */
         0xf4,             /* hlt */
     ];
 
@@ -62,6 +62,7 @@ fn main() {
     vm.reinit().expect("failed to re-initialize VM");
     vm.set_topology(1, 1, 1).expect("failed to set CPU topology");
     vm.set_x2apic_state(BSP, false).expect("failed to disable x2APIC");
+    vm.set_capability(BSP, vm_cap_type::VM_CAP_UNRESTRICTED_GUEST, 1).expect("unrestricted guest capability not available");
 
     vm.setup_lowmem(host_addr as u64, mem_size).expect("failed to set guest memory");
 
@@ -75,15 +76,13 @@ fn main() {
     unsafe {
         let mut slice = slice::from_raw_parts_mut(offset as *mut u8, slice_size);
         slice.write(&asm_code).unwrap();
-//        let slice = slice::from_raw_parts_mut(host_addr, mem_size);
-//        let (_, mut offset) = slice.split_at_mut(guest_addr / 8);
-//        offset.write(&asm_code).unwrap();
     }
 
     // Setup registers
     vm.vcpu_reset(BSP).expect("failed to set initial state of registers");
 
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RIP, guest_addr as u64).expect("failed to set RIP register");
+    println!("Setting inputs to multiply 2 x 3");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RAX, 2).expect("failed to set RAX register");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RBX, 3).expect("failed to set RBX register");
 
@@ -97,11 +96,18 @@ fn main() {
 
     loop {
         match vm.run(BSP).expect("failed to run VM") {
-            VmExit::InOut => {
-                println!("exit for InOut");
+            VmExit::InOut(port, eax) => {
+                println!("exit for InOut, port={}, eax={}", port, eax);
+                if eax == 53 {
+                    println!("Got expected result, ASCII code for the number 5");
+                }
             }
             VmExit::Vmx(s, r, q, t, e) => {
                 println!("exit for Vmx, source={}, reason={}, qualification={}, inst type={}, inst error={}", s, r, q, t, e);
+                //break;
+            }
+            VmExit::Bogus => {
+                println!("exit for Bogus");
                 break;
             }
             VmExit::Halt => {
