@@ -64,6 +64,7 @@ fn main() {
     vm.set_topology(1, 1, 1).expect("failed to set CPU topology");
     vm.set_x2apic_state(BSP, false).expect("failed to disable x2APIC");
     vm.set_capability(BSP, vm_cap_type::VM_CAP_UNRESTRICTED_GUEST, 1).expect("unrestricted guest capability not available");
+    vm.set_capability(BSP, vm_cap_type::VM_CAP_HALT_EXIT, 1).expect("exit on halt guest capability not available");
 
     vm.setup_lowmem(host_addr as u64, mem_size).expect("failed to set guest memory");
 
@@ -81,6 +82,9 @@ fn main() {
 
     // Setup registers
     vm.vcpu_reset(BSP).expect("failed to set initial state of registers");
+
+    let (base, limit, access) = vm.get_desc(BSP, vm_reg_name::VM_REG_GUEST_CS).expect("failed to get CS desc");
+    vm.set_desc(BSP, vm_reg_name::VM_REG_GUEST_CS, guest_addr as u64, limit, access).expect("failed to set CS desc");
 
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RIP, guest_addr as u64).expect("failed to set RIP register");
     println!("Setting inputs to multiply 2 x 3");
@@ -120,6 +124,10 @@ fn main() {
             }
             VmExit::Halt => {
                 println!("exit for Halt");
+                break;
+            }
+            VmExit::Suspended => {
+                println!("exit for Suspended");
                 break;
             }
             reason => println!("Unhandled exit reason {:?}", reason)
