@@ -87,7 +87,7 @@ fn main() {
     vm.set_desc(BSP, vm_reg_name::VM_REG_GUEST_CS, guest_addr as u64, limit, access).expect("failed to set CS desc");
 
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RIP, guest_addr as u64).expect("failed to set RIP register");
-    println!("Setting inputs to multiply 2 x 3");
+    println!("Setting inputs to add 2 + 3");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RAX, 2).expect("failed to set RAX register");
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RBX, 3).expect("failed to set RBX register");
 
