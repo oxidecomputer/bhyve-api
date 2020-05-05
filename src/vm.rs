@@ -1,6 +1,6 @@
 //! Bhyve virtual machine operations.
 
-use libc::{ioctl, open, O_RDWR, c_void};
+use libc::{ioctl, open, O_RDWR, c_void, sysconf, _SC_PAGESIZE};
 use std::ffi::{CString, CStr};
 use std::fs::File;
 use std::io::{Error, ErrorKind};
@@ -13,6 +13,8 @@ use crate::include::specialreg::{CR0_NE};
 
 const MB: u64 = (1024 * 1024);
 const GB: u64 = (1024 * MB);
+
+const MAX_BOOTROM_SIZE: usize = 16 * MB as usize;
 
 // Size of the guard region before and after the virtual address space
 // mapping the guest physical memory. This must be a multiple of the
@@ -280,6 +282,13 @@ impl VirtualMachine {
     ///
     /// Returns Ok if successful, and an Error otherwise.
     pub fn setup_bootrom(&self, base: u64, len: usize) -> Result<bool, Error> {
+
+        let page_size: usize = unsafe { sysconf(_SC_PAGESIZE) as usize };
+        // Limit bootrom size to 16MB so it doesn't encroach into reserved
+        // MMIO space (e.g. APIC, HPET, MSI).
+        if len > MAX_BOOTROM_SIZE || len < page_size {
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
         // Map the bootrom into the host address space
         self.add_devmem(MemSegId::VM_BOOTROM, "bootrom", base, len)?;
 
