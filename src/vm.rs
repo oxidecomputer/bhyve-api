@@ -55,7 +55,8 @@ impl VirtualMachine {
         })
     }
 
-    /// Map segment 'segid' starting at 'off' into guest address range (gpa,gpa+len).
+    /// Map the memory segment identified by 'segid' into the guest address space
+    /// at [gpa,gpa+len) with protection 'prot'.
     pub fn mmap_memseg(&self, gpa: u64, segid: MemSegId, off: i64, len: usize, prot: i32) -> Result<bool, Error> {
         let mut flags = 0;
         if (self.memflags & VM_MEM_F_WIRED) != 0 {
@@ -119,6 +120,7 @@ impl VirtualMachine {
         }
     }
 
+    /// Unmap the memory segment at the guest physical address range [gpa,gpa+len)
     pub fn munmap_memseg(&self, gpa: u64, len: usize) -> Result<bool, Error> {
         // Struct is allocated (and owned) by Rust
         let mem_data = vm_munmap {
