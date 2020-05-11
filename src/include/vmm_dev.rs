@@ -391,4 +391,13 @@ mod tests {
         assert_eq!(VM_SET_TOPOLOGY as u32, 0x8008763f);
         assert_eq!(VM_GET_TOPOLOGY as u32, 0x40087640);
     }
+
+    #[test]
+    fn test_ioctl_memory() {
+        assert_eq!(size_of::<vm_memseg>(), 0x50);
+        assert_eq!(size_of::<vm_memmap>(), 0x28);
+        assert_eq!(VM_ALLOC_MEMSEG as u32, 0x8050760E);
+        assert_eq!(VM_MMAP_MEMSEG as u32, 0x80287610);
+        assert_eq!(VM_MMAP_GETNEXT as u32, 0xc0287611);
+    }
 }
