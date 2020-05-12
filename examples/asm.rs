@@ -19,10 +19,12 @@ const RTC_LMEM_LSB: i32 = 0x34;
 const RTC_LMEM_MSB: i32 = 0x35;
 
 const KB: usize = 1024;
-const MB: usize = (1024 * KB);
+const MB: usize = 1024 * KB;
 
-const m_64KB: usize = (64*KB);
-const m_16MB: usize = (16*MB);
+#[allow(non_upper_case_globals)]
+const m_64KB: usize = 64*KB;
+#[allow(non_upper_case_globals)]
+const m_16MB: usize = 16*MB;
 
 
 
@@ -83,7 +85,7 @@ fn main() {
     // Setup registers
     vm.vcpu_reset(BSP).expect("failed to set initial state of registers");
 
-    let (base, limit, access) = vm.get_desc(BSP, vm_reg_name::VM_REG_GUEST_CS).expect("failed to get CS desc");
+    let (_base, limit, access) = vm.get_desc(BSP, vm_reg_name::VM_REG_GUEST_CS).expect("failed to get CS desc");
     vm.set_desc(BSP, vm_reg_name::VM_REG_GUEST_CS, guest_addr as u64, limit, access).expect("failed to set CS desc");
 
     vm.set_register(BSP, vm_reg_name::VM_REG_GUEST_RIP, guest_addr as u64).expect("failed to set RIP register");

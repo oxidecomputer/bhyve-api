@@ -11,8 +11,8 @@ use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state, seg_desc};
 use crate::include::vmm_dev::*;
 use crate::include::specialreg::{CR0_NE};
 
-const MB: u64 = (1024 * 1024);
-const GB: u64 = (1024 * MB);
+const MB: u64 = 1024 * 1024;
+const GB: u64 = 1024 * MB;
 
 const MAX_BOOTROM_SIZE: usize = 16 * MB as usize;
 

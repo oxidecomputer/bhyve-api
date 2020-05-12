@@ -11,7 +11,7 @@ use crate::include::vmm::*;
 
 // Define const from sys/param.h
 
-const SPECNAMELEN: usize = 63; // max length of devicename
+const SPECNAMELEN: usize = 255; // max length of devicename
 
 // Define struct from sys/time.h
 
@@ -34,7 +34,7 @@ const IOCPARM_SIZESHIFT: c_uint = 16;
 const IOC_VOID: c_uint = 0x20000000;    // no parameters
 const IOC_OUT: c_uint = 0x40000000;     // copy out parameters
 const IOC_IN: c_uint = 0x80000000;      // copy in parameters
-const IOC_INOUT: c_uint = (IOC_IN|IOC_OUT);
+const IOC_INOUT: c_uint = IOC_IN|IOC_OUT;
 
 // Macro for defining all Bhyve ioctl operation constants.
 macro_rules! define_ioctl_op {
@@ -46,7 +46,7 @@ macro_rules! define_ioctl_op {
 // Define constants from machine/vmm_dev.h
 
 // Identifies ioctl ops for Bhyve
-const VMM_IOC_GROUP: c_uint = (118 << 8); // 118 is ASCII for 'v'
+const VMM_IOC_GROUP: c_uint = 118 << 8; // 118 is ASCII for 'v'
 
 #[repr(C)]
 #[allow(non_camel_case_types, unused)]
@@ -178,9 +178,9 @@ pub const VM_DEVMEM_GETOFFSET: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_D
 
 
 // ioctls used against ctl device for vm create/destroy
-const VMM_IOC_BASE: c_int = ((86 << 16) | (77 << 8)); // ASCII for 'V' and 'M'
-pub const VMM_CREATE_VM: c_int = (VMM_IOC_BASE | 0x01);
-pub const VMM_DESTROY_VM: c_int = (VMM_IOC_BASE | 0x02);
+const VMM_IOC_BASE: c_int = (86 << 16) | (77 << 8); // ASCII for 'V' and 'M'
+pub const VMM_CREATE_VM: c_int = VMM_IOC_BASE | 0x01;
+pub const VMM_DESTROY_VM: c_int = VMM_IOC_BASE | 0x02;
 
 
 // Define structs from machine/vmm_dev.h
@@ -340,7 +340,7 @@ pub struct vm_cpu_topology {
     pub maxcpus: u16,
 }
 
-const MAX_VM_STATS: usize = (64 + VM_MAXCPU);
+const MAX_VM_STATS: usize = 64 + VM_MAXCPU;
 
 // For VM_STATS_IOC
 #[repr(C)]
