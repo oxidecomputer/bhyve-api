@@ -18,3 +18,5 @@
 pub mod system;
 pub mod vm;
 mod include;
+
+pub use vmm_sys_util::errno::Error;

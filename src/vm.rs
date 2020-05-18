@@ -1,15 +1,15 @@
 //! Bhyve virtual machine operations.
 
-use libc::{ioctl, open, O_RDWR, c_void, sysconf, _SC_PAGESIZE};
+use libc::{ioctl, open, O_RDWR, c_void, sysconf, _SC_PAGESIZE, EINVAL, EFAULT};
 use std::ffi::{CString, CStr};
 use std::fs::File;
-use std::io::{Error, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 pub use crate::include::vmm::{vm_cap_type, vm_reg_name};
 use crate::include::vmm::{vm_suspend_how, vm_exitcode, x2apic_state, seg_desc};
 use crate::include::vmm_dev::*;
 use crate::include::specialreg::{CR0_NE};
+use crate::Error;
 
 const MB: u64 = 1024 * 1024;
 const GB: u64 = 1024 * MB;
@@ -38,10 +38,13 @@ impl VirtualMachine {
 
     pub fn new(name: &str) -> Result<VirtualMachine, Error> {
         let path = format!("/dev/vmm/{}", name);
-        let c_path = CString::new(path)?;
+        let c_path = match CString::new(path) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::new(EINVAL))
+        };
         let raw_fd = unsafe { open(c_path.as_ptr(), O_RDWR) };
         if raw_fd < 0 {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
         let safe_handle = unsafe { File::from_raw_fd(raw_fd) };
 
@@ -86,7 +89,7 @@ impl VirtualMachine {
                 } else {
                     // The existing memory segment is not identical to the one we want
                     // to create, so return an error value.
-                    return Err(Error::from(ErrorKind::AlreadyExists));
+                    return Err(Error::new(EFAULT));
                 }
             }
             Err(_) => (), // The memory segment wasn't found, so we should create it
@@ -96,7 +99,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -116,7 +119,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(memseg_data);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -132,12 +135,15 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
     pub fn alloc_memseg(&self, segid: MemSegId, len: usize, name: &str) -> Result<bool, Error> {
-        let c_name = CString::new(name)?;
+        let c_name = match CString::new(name) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::new(EINVAL))
+        };
 
         // If the memory segment has already been created then just return.
         // This is the usual case for the SYSMEM segment created by userspace
@@ -155,7 +161,7 @@ impl VirtualMachine {
                 } else {
                     // The existing memory segment is not identical to the one we want
                     // to allocate, so return an error value.
-                    return Err(Error::from(ErrorKind::InvalidInput));
+                    return Err(Error::new(EINVAL));
                 }
             }
             Err(e) => return Err(e),
@@ -173,7 +179,7 @@ impl VirtualMachine {
             // Don't copy the name if the string is empty (zero length)
             if name_length >= memseg_data.name.len() {
                 // name is too long for vm_memseg struct
-                return Err(Error::from(ErrorKind::InvalidInput));
+                return Err(Error::new(EINVAL));
             } else {
                 // Copy each character from the CString to the char array
                 for (to, from) in memseg_data.name.iter_mut().zip(c_name.as_bytes_with_nul()) {
@@ -186,7 +192,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -201,7 +207,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(memseg_data);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -255,7 +261,7 @@ impl VirtualMachine {
             )
         };
         if ptr == libc::MAP_FAILED {
-            return Err(Error::from(ErrorKind::AddrNotAvailable));
+            return Err(Error::new(EFAULT));
         }
 
         return Ok(true);
@@ -276,7 +282,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(memseg_data.offset);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -289,7 +295,7 @@ impl VirtualMachine {
         // Limit bootrom size to 16MB so it doesn't encroach into reserved
         // MMIO space (e.g. APIC, HPET, MSI).
         if len > MAX_BOOTROM_SIZE || len < page_size {
-            return Err(Error::from(ErrorKind::InvalidInput));
+            return Err(Error::new(EINVAL));
         }
         // Map the bootrom into the host address space
         self.add_devmem(MemSegId::VM_BOOTROM, "bootrom", base, len)?;
@@ -304,7 +310,7 @@ impl VirtualMachine {
 
     pub fn setup_lowmem(&self, base: u64, len: usize) -> Result<bool, Error> {
         if len > self.lowmem_limit {
-            return Err(Error::from(ErrorKind::InvalidInput));
+            return Err(Error::new(EINVAL));
         }
 
 	let gpa: u64 = 0;
@@ -334,7 +340,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -350,7 +356,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok((seg_data.desc.base, seg_data.desc.limit, seg_data.desc.access));
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -366,7 +372,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -382,7 +388,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(reg_data.regval);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -396,7 +402,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -410,7 +416,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(rtc_data.value);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -423,7 +429,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -434,7 +440,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(rtc_data.secs);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -452,7 +458,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -465,7 +471,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok((top.sockets, top.cores, top.threads, top.maxcpus));
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -480,7 +486,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(stats_data.num_entries);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -492,7 +498,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -511,7 +517,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -526,10 +532,10 @@ impl VirtualMachine {
             match x2apic_data.state {
                 x2apic_state::X2APIC_ENABLED => return Ok(true),
                 x2apic_state::X2APIC_DISABLED => return Ok(false),
-                x2apic_state::X2APIC_STATE_LAST => return Err(Error::from(ErrorKind::InvalidData)),
+                x2apic_state::X2APIC_STATE_LAST => return Err(Error::new(EINVAL)),
             }
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -601,7 +607,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -613,7 +619,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -727,7 +733,7 @@ impl VirtualMachine {
                 }
             }
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -738,7 +744,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(result);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -749,7 +755,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(result);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -760,7 +766,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(result);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -771,7 +777,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(result);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -781,7 +787,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(result);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -797,7 +803,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(cap_data.capval);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 
@@ -814,7 +820,7 @@ impl VirtualMachine {
         if result == 0 {
             return Ok(true);
         } else {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
     }
 }

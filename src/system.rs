@@ -1,12 +1,12 @@
 // Copyright (C) 2020, Oxide Computer Company
 
-use libc::{ioctl, open, O_EXCL, O_RDWR};
+use libc::{ioctl, open, O_EXCL, O_RDWR, EINVAL};
 use std::ffi::CString;
 use std::fs::File;
-use std::io::Error;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
 use crate::include::vmm_dev::{VMM_CREATE_VM, VMM_DESTROY_VM};
+use crate::Error;
 
 /// The VMMSystem module handles VMM system operations. It creates and
 /// owns the initial filehandle on `/dev/vmmctl`.
@@ -27,10 +27,13 @@ impl VMMSystem {
     /// operations.
 
     pub fn new() -> Result<VMMSystem, Error> {
-        let path = CString::new("/dev/vmmctl")?;
-        let raw_fd = unsafe { open(path.as_ptr(), O_RDWR | O_EXCL) };
+        let c_path = match CString::new("/dev/vmmctl") {
+            Ok(s) => s,
+            Err(_) => return Err(Error::new(EINVAL))
+        };
+        let raw_fd = unsafe { open(c_path.as_ptr(), O_RDWR | O_EXCL) };
         if raw_fd < 0 {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         }
         let safe_handle = unsafe { File::from_raw_fd(raw_fd) };
 
@@ -47,10 +50,13 @@ impl VMMSystem {
     /// integer containing the integer return value of the ioctl operation.
 
     pub fn create_vm(&self, name: &str) -> Result<i32, Error> {
-        let c_name = CString::new(name)?;
+        let c_name = match CString::new(name) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::new(EINVAL))
+        };
         let result = unsafe { ioctl(self.vmmctl.as_raw_fd(), VMM_CREATE_VM, c_name.as_ptr()) };
         if result == -1 {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         } else {
             return Ok(result);
         }
@@ -62,10 +68,13 @@ impl VMMSystem {
     /// integer containing the integer return value of the ioctl operation.
 
     pub fn destroy_vm(&self, name: &str) -> Result<i32, Error> {
-        let c_name = CString::new(name)?;
+        let c_name = match CString::new(name) {
+            Ok(s) => s,
+            Err(_) => return Err(Error::new(EINVAL))
+        };
         let result = unsafe { ioctl(self.vmmctl.as_raw_fd(), VMM_DESTROY_VM, c_name.as_ptr()) };
         if result == -1 {
-            return Err(Error::last_os_error());
+            return Err(Error::last());
         } else {
             return Ok(result);
         }

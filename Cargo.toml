@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 libc = "*"
+vmm-sys-util = { git = "https://github.com/rust-vmm/vmm-sys-util" }
