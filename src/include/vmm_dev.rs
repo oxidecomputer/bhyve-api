@@ -394,9 +394,9 @@ mod tests {
 
     #[test]
     fn test_ioctl_memory() {
-        assert_eq!(size_of::<vm_memseg>(), 0x50);
+        assert_eq!(size_of::<vm_memseg>(), 0x110);
         assert_eq!(size_of::<vm_memmap>(), 0x28);
-        assert_eq!(VM_ALLOC_MEMSEG as u32, 0x8050760E);
+        assert_eq!(VM_ALLOC_MEMSEG as u32, 0x8010760E);
         assert_eq!(VM_MMAP_MEMSEG as u32, 0x80287610);
         assert_eq!(VM_MMAP_GETNEXT as u32, 0xc0287611);
     }
