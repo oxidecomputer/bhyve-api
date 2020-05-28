@@ -174,6 +174,19 @@ pub const VM_RTC_READ: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_RTC_RE
 pub const VM_RTC_SETTIME: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RTC_SETTIME as c_uint, (size_of::<vm_rtc_time>() as c_uint));
 pub const VM_RTC_GETTIME: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_RTC_GETTIME as c_uint, (size_of::<vm_rtc_time>() as c_uint));
 
+pub const VM_SET_INTINFO: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_SET_INTINFO as c_uint, (size_of::<vm_intinfo>() as c_uint));
+pub const VM_GET_INTINFO: c_int = define_ioctl_op!(IOC_INOUT, IocNum::IOCNUM_GET_INTINFO as c_uint, (size_of::<vm_intinfo>() as c_uint));
+pub const VM_INJECT_EXCEPTION: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_INJECT_EXCEPTION as c_uint, (size_of::<vm_exception>() as c_uint));
+pub const VM_INJECT_NMI: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_INJECT_NMI as c_uint, (size_of::<vm_nmi>() as c_uint));
+pub const VM_LAPIC_IRQ: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_LAPIC_IRQ as c_uint, (size_of::<vm_lapic_irq>() as c_uint));
+pub const VM_LAPIC_LOCAL_IRQ: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_LAPIC_LOCAL_IRQ as c_uint, (size_of::<vm_lapic_irq>() as c_uint));
+pub const VM_LAPIC_MSI: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_LAPIC_MSI as c_uint, (size_of::<vm_lapic_msi>() as c_uint));
+pub const VM_IOAPIC_ASSERT_IRQ: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_IOAPIC_ASSERT_IRQ as c_uint, (size_of::<vm_ioapic_irq>() as c_uint));
+pub const VM_IOAPIC_DEASSERT_IRQ: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_IOAPIC_DEASSERT_IRQ as c_uint, (size_of::<vm_ioapic_irq>() as c_uint));
+pub const VM_IOAPIC_PULSE_IRQ: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_IOAPIC_PULSE_IRQ as c_uint, (size_of::<vm_ioapic_irq>() as c_uint));
+pub const VM_IOAPIC_PINCOUNT: c_int = define_ioctl_op!(IOC_OUT, IocNum::IOCNUM_IOAPIC_PINCOUNT as c_uint, (size_of::<c_int>() as c_uint));
+pub const VM_RESTART_INSTRUCTION: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_RESTART_INSTRUCTION as c_uint, (size_of::<c_int>() as c_uint));
+
 pub const VM_DEVMEM_GETOFFSET: c_int = define_ioctl_op!(IOC_IN, IocNum::IOCNUM_DEVMEM_GETOFFSET as c_uint, (size_of::<vm_devmem_offset>() as c_uint));
 
 
@@ -362,6 +375,57 @@ impl Default for vm_stats {
         }
     }
 }
+
+// For VM_SET_INTINFO and VM_GET_INTINFO
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_intinfo {
+    pub vcpuid: c_int,
+    pub info1: c_ulonglong,
+    pub info2: c_ulonglong,
+}
+
+// For VM_INJECT_EXCEPTION
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_exception {
+    pub cpuid: c_int,
+    pub vector: c_int,
+    pub error_code: c_uint,
+    pub error_code_valid: c_int,
+    pub restart_instruction: c_int,
+}
+
+// For VM_INJECT_NMI
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_nmi {
+    pub cpuid: c_int,
+}
+
+// For VM_LAPIC_MSI
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_lapic_msi {
+    pub msg: c_ulonglong,
+    pub addr: c_ulonglong,
+}
+
+// For VM_LAPIC_IRQ and VM_LAPIC_LOCAL_IRQ
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_lapic_irq {
+    pub cpuid: c_int,
+    pub vector: c_int,
+}
+
+// For VM_IOAPIC_ASSERT_IRQ, VM_IOAPIC_DEASSERT_IRQ, and VM_IOAPIC_PULSE_IRQ
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+pub struct vm_ioapic_irq {
+    pub irq: c_int,
+}
+
 
 #[cfg(test)]
 mod tests {

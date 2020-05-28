@@ -823,6 +823,186 @@ impl VirtualMachine {
             return Err(Error::last());
         }
     }
+
+    /// Set interrupt info on the VCPU
+    pub fn set_intinfo(&self, vcpu_id: i32, info1: u64) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let intinfo_data = vm_intinfo {
+            vcpuid: vcpu_id,
+            info1: info1,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_SET_INTINFO, &intinfo_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Get the interrupt info on the VCPU
+    pub fn get_intinfo(&self, vcpu_id: i32) -> Result<(u64, u64), Error> {
+        // Struct is allocated (and owned) by Rust, but modified by C
+        let mut intinfo_data = vm_intinfo {
+            vcpuid: vcpu_id,
+            ..Default::default()
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_GET_INTINFO, &mut intinfo_data) };
+        if result == 0 {
+            return Ok((intinfo_data.info1, intinfo_data.info2));
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Inject an exception on the VCPU
+    pub fn inject_exception(&self, vcpu_id: i32, vector: i32, valid: i32, errcode: u32, restart: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let exc_data = vm_exception {
+            cpuid: vcpu_id,
+            vector: vector,
+            error_code: errcode,
+            error_code_valid: valid,
+            restart_instruction: restart,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_INJECT_EXCEPTION, &exc_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Inject non-maskable interrupt (NMI) on the VCPU
+    pub fn inject_nmi(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let nmi_data = vm_nmi {
+            cpuid: vcpu_id,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_INJECT_NMI, &nmi_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Signal to the Local Advanced Programmable Interrupt Controller (LAPIC)
+    /// that an interrupt request (IRQ) at 'vector' needs to be sent to the VCPU
+    /// identified by 'vcpu_id'. The state of the interrupt request is recorded in
+    /// the LAPIC interrupt request register (IRR).
+    pub fn lapic_irq(&self, vcpu_id: i32, vector: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let irq_data = vm_lapic_irq {
+            cpuid: vcpu_id,
+            vector: vector,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_LAPIC_IRQ, &irq_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Trigger an interrupt request (IRQ) according to the local vector table
+    /// (LVT) on the Local Advanced Programmable Interrupt Controller (LAPIC)
+    /// for the VCPU identified by 'vcpu_id'. The 'vcpu_id' can be set to -1 to
+    /// trigger the interrupt on all VCPUs.
+    pub fn lapic_local_irq(&self, vcpu_id: i32, vector: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let irq_data = vm_lapic_irq {
+            cpuid: vcpu_id,
+            vector: vector,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_LAPIC_LOCAL_IRQ, &irq_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Signal an interrupt using Message Signaled Interrupts (MSI)
+    pub fn lapic_msi(&self, addr: u64, msg: u64) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let msi_data = vm_lapic_msi {
+            msg: msg,
+            addr: addr,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_LAPIC_MSI, &msi_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Set the I/O APIC pin state for an interrupt request (IRQ) on the VM to true.
+    pub fn ioapic_assert_irq(&self, irq: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let irq_data = vm_ioapic_irq {
+            irq: irq,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_IOAPIC_ASSERT_IRQ, &irq_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Set the I/O APIC pin state for an interrupt request (IRQ) on the VM to false.
+    pub fn ioapic_deassert_irq(&self, irq: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let irq_data = vm_ioapic_irq {
+            irq: irq,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_IOAPIC_DEASSERT_IRQ, &irq_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Set the I/O APIC pin state for an interrupt request (IRQ) on the VM to
+    /// true and then false (a "pulse").
+    pub fn ioapic_pulse_irq(&self, irq: i32) -> Result<bool, Error> {
+        // Struct is allocated (and owned) by Rust
+        let irq_data = vm_ioapic_irq {
+            irq: irq,
+        };
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_IOAPIC_PULSE_IRQ, &irq_data) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Get the I/O APIC pincount for the VM
+    pub fn ioapic_pincount(&self) -> Result<i32, Error> {
+        // Integer is allocated (and owned) by Rust, but modified by C
+        let mut pincount: i32 = 0;
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_IOAPIC_PINCOUNT, &mut pincount) };
+        if result == 0 {
+            return Ok(pincount);
+        } else {
+            return Err(Error::last());
+        }
+    }
+
+    /// Restart the current instruction on the VCPU
+    pub fn restart_instruction(&self, vcpu_id: i32) -> Result<bool, Error> {
+        // Integer is allocated (and owned) by Rust
+        let result = unsafe { ioctl(self.vm.as_raw_fd(), VM_RESTART_INSTRUCTION, &vcpu_id) };
+        if result == 0 {
+            return Ok(true);
+        } else {
+            return Err(Error::last());
+        }
+    }
 }
 
 // Different styles of mapping the memory assigned to a VM into the address
