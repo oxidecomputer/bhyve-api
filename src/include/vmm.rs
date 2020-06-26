@@ -239,7 +239,7 @@ impl vm_inout {
             return false;
         }
     }
-    pub fn is_rep(&self) -> bool {
+    pub fn is_repeat(&self) -> bool {
         // We only care about the sixth bit of the bitfield
         let mask: u16 = 0b0100000;
         if (self.bitfields & mask) == mask {
@@ -258,7 +258,8 @@ pub struct vm_inout_str {
     pub rflags: c_ulonglong,
     pub cr0: c_ulonglong,
     pub index: c_ulonglong,
-    pub count: c_ulonglong,
+    pub count: c_ulonglong, // is_repeat=true (%rcx), is_repeat=false (1)
+    pub addrsize: c_int,
     pub segname: vm_reg_name,
     pub seg_desc: seg_desc,
 }

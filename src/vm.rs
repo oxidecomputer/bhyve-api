@@ -60,7 +60,7 @@ impl VirtualMachine {
 
     /// Map the memory segment identified by 'segid' into the guest address space
     /// at [gpa,gpa+len) with protection 'prot'.
-    pub fn mmap_memseg(&self, gpa: u64, segid: MemSegId, off: i64, len: usize, prot: i32) -> Result<bool, Error> {
+    pub fn mmap_memseg(&self, gpa: u64, segid: i32, off: i64, len: usize, prot: i32) -> Result<bool, Error> {
         let mut flags = 0;
         if (self.memflags & VM_MEM_F_WIRED) != 0 {
             flags = VM_MEMMAP_F_WIRED;
@@ -68,7 +68,7 @@ impl VirtualMachine {
 
         let mem_data = vm_memmap {
             gpa: gpa,
-            segid: segid as i32,
+            segid: segid,
             segoff: off,
             len: len,
             prot: prot,
@@ -139,7 +139,7 @@ impl VirtualMachine {
         }
     }
 
-    pub fn alloc_memseg(&self, segid: MemSegId, len: usize, name: &str) -> Result<bool, Error> {
+    pub fn alloc_memseg(&self, segid: i32, len: usize, name: &str) -> Result<bool, Error> {
         let c_name = match CString::new(name) {
             Ok(s) => s,
             Err(_) => return Err(Error::new(EINVAL))
@@ -169,7 +169,7 @@ impl VirtualMachine {
 
         // Struct is allocated (and owned) by Rust
         let mut memseg_data = vm_memseg {
-            segid: segid as i32,
+            segid: segid,
             len: len,
             ..Default::default()
         };
@@ -196,10 +196,10 @@ impl VirtualMachine {
         }
     }
 
-    fn get_memseg(&self, segid: MemSegId) -> Result<vm_memseg, Error> {
+    fn get_memseg(&self, segid: i32) -> Result<vm_memseg, Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
         let mut memseg_data = vm_memseg {
-            segid: segid as i32,
+            segid: segid,
             ..Default::default()
         };
 
@@ -211,7 +211,7 @@ impl VirtualMachine {
         }
     }
 
-    fn add_devmem(&self, segid: MemSegId, name: &str, base: u64, len: usize) -> Result<bool, Error> {
+    fn add_devmem(&self, segid: i32, name: &str, base: u64, len: usize) -> Result<bool, Error> {
         self.alloc_memseg(segid, len, name)?;
         let mapoff = self.get_devmem_offset(segid)?;
 
@@ -242,12 +242,15 @@ impl VirtualMachine {
 
     }
 
-    fn add_guest_memory(&self, segid: MemSegId, gpa: u64, base: u64, len: usize) -> Result<bool, Error> {
-        self.alloc_memseg(segid, len, "")?; // only devices name their memory regions
+    pub fn add_guest_memory(&self, segid: i32, gpa: u64, base: u64, len: usize, readonly: bool) -> Result<bool, Error> {
+        self.alloc_memseg(segid, len, "")?; // Unnamed memory regions, identified by segment id
 
         // Map the guest memory into the guest address space
-	let prot = libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC;
-	self.mmap_memseg(gpa, MemSegId::VM_LOWMEM, 0, len, prot)?;
+	let prot = match readonly {
+            true => libc::PROT_READ | libc::PROT_EXEC,
+            false => libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+        };
+	self.mmap_memseg(gpa, segid, 0, len, prot)?;
 
         // mmap into the process address space on the host
         let ptr = unsafe {
@@ -271,10 +274,10 @@ impl VirtualMachine {
     /// Gets the map offset for the device memory segment 'segid'.
     ///
     /// Returns Ok containing the offset if successful, and an Error otherwise.
-    fn get_devmem_offset(&self, segid: MemSegId) -> Result<i64, Error> {
+    fn get_devmem_offset(&self, segid: i32) -> Result<i64, Error> {
         // Struct is allocated (and owned) by Rust, but modified by C
         let mut memseg_data = vm_devmem_offset {
-            segid: segid as i32,
+            segid: segid,
             ..Default::default()
         };
 
@@ -298,12 +301,12 @@ impl VirtualMachine {
             return Err(Error::new(EINVAL));
         }
         // Map the bootrom into the host address space
-        self.add_devmem(MemSegId::VM_BOOTROM, "bootrom", base, len)?;
+        self.add_devmem(MemSegId::VM_BOOTROM as i32, "bootrom", base, len)?;
 
         // Map the bootrom into the guest address space
 	let prot = libc::PROT_READ | libc::PROT_EXEC;
 	let gpa: u64 = (1 << 32) - len as u64;
-	self.mmap_memseg(gpa, MemSegId::VM_BOOTROM, 0, len, prot)?;
+	self.mmap_memseg(gpa, MemSegId::VM_BOOTROM as i32, 0, len, prot)?;
 
         Ok(true)
     }
@@ -314,16 +317,18 @@ impl VirtualMachine {
         }
 
 	let gpa: u64 = 0;
+        let readonly = false;
         // Map the guest memory into the host address space
-        self.add_guest_memory(MemSegId::VM_LOWMEM, gpa, base, len)?;
+        self.add_guest_memory(MemSegId::VM_LOWMEM as i32, gpa, base, len, readonly)?;
 
         Ok(true)
     }
 
     pub fn setup_highmem(&self, base: u64, len: usize) -> Result<bool, Error> {
 	let gpa: u64 = 4 * GB;
+        let readonly = false;
         // Map the guest memory into the host address space
-        self.add_guest_memory(MemSegId::VM_HIGHMEM, gpa, base, len)?;
+        self.add_guest_memory(MemSegId::VM_HIGHMEM as i32, gpa, base, len, readonly)?;
 
         Ok(true)
     }
@@ -638,14 +643,45 @@ impl VirtualMachine {
             println!("VCPU ID is {}", cid);
             match run_data.vm_exit.exitcode {
                 vm_exitcode::VM_EXITCODE_INOUT => {
+                    // Safe because the exit code told us which union field to use.
                     let io = unsafe { run_data.vm_exit.u.inout };
                     let port = io.port;
-                    let eax = io.eax;
-                    println!("bitfield bytes is {}", io.bytes());
-                    println!("bitfield in is {}", io.is_in());
-                    println!("bitfield string is {}", io.is_string());
-                    println!("bitfield rep is {}", io.is_rep());
-                    return Ok(VmExit::InOut(port, eax));
+                    let value = io.eax;
+                    let bytes = io.bytes();
+
+                    if io.is_in() {
+                        return Ok(VmExit::IoIn(port, bytes));
+                    } else {
+                        return Ok(VmExit::IoOut(port, bytes, value));
+                    }
+                }
+                vm_exitcode::VM_EXITCODE_INOUT_STR => {
+                    // Safe because the exit code told us which union field to use.
+                    let vis = unsafe { run_data.vm_exit.u.inout_str };
+                    let io = vis.inout;
+                    let port = io.port;
+
+                    if !io.is_string() {
+                        return Err(Error::new(EINVAL));
+                    }
+
+                    let mask: u64 = match vis.addrsize {
+                        2 => 0xffff,
+                        4 => 0xffffffff,
+                        8 => 0xffffffffffffffff,
+                        _ => return Err(Error::new(EINVAL))
+                    };
+
+                    let index: u64 = vis.index & mask;
+                    let count: u64 = vis.count & mask;
+
+                    let bytes = io.bytes();
+                    let repeat = io.is_repeat();
+                    if io.is_in() {
+                        return Ok(VmExit::IoInStr(port, bytes, index, count, repeat));
+                    } else {
+                        return Ok(VmExit::IoOutStr(port, bytes, index, count, repeat));
+                    }
                 }
                 vm_exitcode::VM_EXITCODE_VMX => {
                     let status = unsafe { run_data.vm_exit.u.vmx.status };
@@ -689,20 +725,11 @@ impl VirtualMachine {
                     return Ok(VmExit::RunBlock);
                 }
                 vm_exitcode::VM_EXITCODE_IOAPIC_EOI => {
-                    return Ok(VmExit::IoApicEoi);
+                    let ioapic = unsafe { run_data.vm_exit.u.ioapic_eoi };
+                    return Ok(VmExit::IoapicEoi(ioapic.vector));
                 }
                 vm_exitcode::VM_EXITCODE_SUSPENDED => {
                     return Ok(VmExit::Suspended);
-                }
-                vm_exitcode::VM_EXITCODE_INOUT_STR => {
-                    let io = unsafe { run_data.vm_exit.u.inout_str.inout };
-                    let port = io.port;
-                    let eax = io.eax;
-                    println!("bitfield bytes is {}", io.bytes());
-                    println!("bitfield in is {}", io.is_in());
-                    println!("bitfield string is {}", io.is_string());
-                    println!("bitfield rep is {}", io.is_rep());
-                    return Ok(VmExit::InOutStr(port, eax));
                 }
                 vm_exitcode::VM_EXITCODE_TASK_SWITCH => {
                     return Ok(VmExit::TaskSwitch);
@@ -1035,9 +1062,12 @@ pub enum MemSegId{
 ///
 /// The exit reasons are mapped to the `VM_EXIT_*` defines in `machine/vmm.h`.
 ///
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub enum VmExit {
-    InOut(u16 /* port */, u32 /* eax */),
+    IoIn(u16 /* port */, u16 /* bytes */),
+    IoOut(u16 /* port */, u16 /* bytes */, u32 /* value */),
+    IoInStr(u16 /* port */, u16 /* bytes */, u64 /* index */, u64 /* count */, bool /* repeat */),
+    IoOutStr(u16 /* port */, u16 /* bytes */, u64 /* index */, u64 /* count */, bool /* repeat */),
     Vmx(i32 /* status */, u32 /* exit reason */, u64 /* exit qualification */, i32 /* instruction type */, i32 /* instruction error */),
     Bogus,
     RdMsr,
@@ -1050,9 +1080,8 @@ pub enum VmExit {
     SpinupAp,
     Deprecated,
     RunBlock,
-    IoApicEoi,
+    IoapicEoi(i32 /* vector */),
     Suspended,
-    InOutStr(u16 /* port */, u32 /* eax */),
     TaskSwitch,
     Monitor,
     Mwait,

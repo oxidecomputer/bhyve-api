@@ -104,14 +104,15 @@ fn main() {
         println!("RIP reg before run is {}", rip);
 
         match vm.run(BSP).expect("failed to run VM") {
-            VmExit::InOut(port, eax) => {
-                println!("exit for InOut, port={}, eax={}", port, eax);
-                if eax == 53 {
+            VmExit::IoOut(port, bytes, value) => {
+                let data: [u8; 4] = value.to_le_bytes();
+                println!("exit for IoOut, port={}, bytes={}, value={}", port, bytes, value);
+                if data[0] == 53 {
                     println!("Got expected result, ASCII code for the number 5");
                 }
             }
-            VmExit::InOutStr(port, eax) => {
-                println!("exit for InOutStr, port={}, eax={}", port, eax);
+            VmExit::IoOutStr(port, bytes, index, count, repeat) => {
+                println!("exit for IoOutStr, port={}, bytes={}, index={}, count={}, repeat={}", port, bytes, index, count, repeat);
             }
             VmExit::Vmx(s, r, q, t, e) => {
                 println!("exit for Vmx, source={}, reason={}, qualification={:b}, inst type={}, inst error={}", s, r, q, t, e);
