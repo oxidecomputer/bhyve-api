@@ -741,7 +741,8 @@ impl VirtualMachine {
                     return Ok(VmExit::Mwait);
                 }
                 vm_exitcode::VM_EXITCODE_SVM => {
-                    return Ok(VmExit::Svm);
+                    let svm = unsafe { run_data.vm_exit.u.svm };
+                    return Ok(VmExit::Svm(svm.exitcode, svm.exitinfo1, svm.exitinfo2));
                 }
                 vm_exitcode::VM_EXITCODE_REQIDLE => {
                     return Ok(VmExit::ReqIdle);
@@ -1085,7 +1086,7 @@ pub enum VmExit {
     TaskSwitch,
     Monitor,
     Mwait,
-    Svm,
+    Svm(u64 /* exitcode */, u64 /* exitinfo1 */, u64 /* exitinfo2 */),
     ReqIdle,
     Debug,
     VmInsn,
