@@ -247,3 +247,22 @@ fn test_task_register() {
 
     teardown_vm(testname);
 }
+
+#[test]
+fn test_extended_feature_register() {
+    let testname = "test_extended_feature_register";
+    let vm = setup_vm(testname);
+
+    const EFER_LMA: u64 = 0x400;
+    const EFER_LME: u64 = 0x100;
+
+    let efer_orig = vm.get_register(TEST_CPUID, vm_reg_name::VM_REG_GUEST_EFER).expect("failed to get EFER register");
+
+    let longmode = efer_orig | EFER_LME | EFER_LMA;
+
+    vm.set_register(TEST_CPUID, vm_reg_name::VM_REG_GUEST_EFER, longmode).expect("failed to set EFER register");
+    let efer = vm.get_register(TEST_CPUID, vm_reg_name::VM_REG_GUEST_EFER).expect("failed to get EFER register");
+    assert_eq!(efer, longmode);
+
+    teardown_vm(testname);
+}
