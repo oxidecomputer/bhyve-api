@@ -1,20 +1,29 @@
-# Bhyve API
+# bhyve API
 
-A Rust library interface to Bhyve's kernel ioctl interface
+A Rust library interface to bhyve's kernel ioctl interface.
+
+This library is unmaintained. In the subsequent years, illumos' bhyve
+kernel interface has changed. This library has not been tested or
+updated to match, and in both cases the interfaces to FreeBSD and
+illumos `bhyve` have diverged.
+
+The Rust bindings for illumos' bhyve as used in Propolis, the userland
+VMM maintained by Oxide, are developed alongside Propolis and housed
+in its repository.
 
 ## Prerequisites
 
-The main requirement is Rust, the Bhyve API library has been tested on
+The main requirement is Rust, the bhyve API library has been tested on
 the version (1.42.0) packaged with OmniOS CE r151032. Install the
 package `ooce/developer/rust`.
 
-### Bhyve
+### bhyve
 
-To run the tests or examples, you will also need Bhyve installed. On
+To run the tests or examples, you will also need bhyve installed. On
 OmniOS CE these packages are `system/bhyve` and
 `system/library/bhyve` (version 0.5.11-151032.0).
 
-Once you've installed the Bhyve packages, you can check if your
+Once you've installed the bhyve packages, you can check if your
 hardware is supported by running:
 
 ```
